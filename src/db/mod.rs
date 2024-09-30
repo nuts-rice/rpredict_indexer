@@ -1,19 +1,14 @@
 pub mod model;
 pub use model::*;
-use slab::Slab;
 pub mod error;
-use self::question::DBQuestion;
-use futures_util::lock::Mutex;
-use std::sync::Arc;
 pub mod graphql;
 use async_graphql::{http::GraphiQLSource, Schema};
 use axum::response::{self, IntoResponse};
-use question::{MutationRoot, QueryRoot, Storage, SubscriptionRoot};
+use question::{MutationRoot, QueryRoot, QuestionStorage, SubscriptionRoot};
 pub enum DbType {
     GraphQL,
 }
 pub type Db = sled::Db;
-pub type QuestionStorage = Arc<Mutex<Slab<DBQuestion>>>;
 
 pub async fn build_graphql() -> impl IntoResponse {
     let response = response::Html(
@@ -27,7 +22,7 @@ pub async fn build_graphql() -> impl IntoResponse {
 
 pub async fn build_schema() {
     let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
-        .data(Storage::default())
+        .data(QuestionStorage::default())
         .finish();
 }
 

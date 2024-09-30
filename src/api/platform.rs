@@ -52,6 +52,3 @@ pub struct Question {
     cloded_at: i64,
     total_liquidity: i32,
 }
-async fn fetch_data() {
-    loop {}
-}

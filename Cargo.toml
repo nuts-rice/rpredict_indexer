@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 async-graphql = "7.0.9"
 async-graphql-axum = "7.0.9"
+async-trait = "0.1.83"
 axum = "0.7.5"
 axum-extra = { version = "0.9.3", features = ["query"] }
 axum-server = "0.7.1"

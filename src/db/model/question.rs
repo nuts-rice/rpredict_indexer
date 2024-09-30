@@ -1,5 +1,3 @@
-use crate::QuestionStorage;
-
 use super::simplebroker::SimpleBroker;
 use async_graphql::*;
 use futures_util::{lock::Mutex, Stream, StreamExt};
@@ -22,23 +20,27 @@ pub type QuestionsSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub struct DBQuestion {
     id: async_graphql::ID,
     text: String,
-    timestamp: i64,
+    created_time: i64,
+    close_time: i64,
 }
 
 #[Object]
 impl DBQuestion {
-    async fn query(&self) -> String {
-        self.text.to_string()
+    async fn id(&self) -> &ID {
+        &self.id
     }
     async fn text(&self) -> &str {
         &self.text
     }
-    async fn timestamp(&self) -> i64 {
-        self.timestamp
+    async fn createdTime(&self) -> &i64 {
+        &self.created_time
+    }
+    async fn closeTime(&self) -> &i64 {
+        &self.close_time
     }
 }
 
-pub type Storage = Arc<Mutex<Slab<DBQuestion>>>;
+pub type QuestionStorage = Arc<Mutex<Slab<DBQuestion>>>;
 
 pub struct QueryRoot;
 
@@ -81,14 +83,21 @@ impl QuestionChanged {
 }
 #[Object]
 impl MutationRoot {
-    async fn add_question(&self, ctx: &Context<'_>, text: String, timestamp: i64) -> ID {
+    async fn add_question(
+        &self,
+        ctx: &Context<'_>,
+        text: String,
+        created_time: i64,
+        close_time: i64,
+    ) -> ID {
         let mut questions = ctx.data_unchecked::<QuestionStorage>().lock().await;
         let entry = questions.vacant_entry();
         let id: ID = entry.key().into();
         let question = DBQuestion {
             id: id.clone(),
             text,
-            timestamp,
+            created_time,
+            close_time,
         };
         questions.insert(question);
         SimpleBroker::publish(QuestionChanged {
