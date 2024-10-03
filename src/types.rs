@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 enum OutcomeType {
     BINARY,
     MULTIPLE_CHOICE,
+    POLL,
 }
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -16,6 +17,7 @@ pub struct Question {
     outcomeType: OutcomeType,
     pool: Option<BetPool>,
 }
+#[derive(Deserialize, Debug, Serialize)]
 pub struct Indicators {
     num_forecasts: i32,
     num_forecasters: i32,

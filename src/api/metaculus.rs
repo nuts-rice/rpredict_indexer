@@ -1,54 +1,39 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
-use crate::polymarket::{parse_polymarket_text, PolymarketMarket};
+use crate::model::metaculus::MetaculusMarket;
 use async_trait::async_trait;
-use axum::extract::Json;
+pub struct MetaculusPlatform(PlatformBuilder<Self>);
 
-//https://github.com/Polymarket/py-clob-client
-pub struct PolymarketPlatform(PlatformBuilder<Self>);
-
-impl From<PlatformBuilder<Self>> for PolymarketPlatform {
+impl From<PlatformBuilder<Self>> for MetaculusPlatform {
     fn from(value: PlatformBuilder<Self>) -> Self {
         Self(value)
     }
 }
 
-pub fn get_headers() -> reqwest::header::HeaderMap {
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(
-        reqwest::header::CONTENT_TYPE,
-        "application/json".parse().unwrap(),
-    );
-    headers
-}
-
 #[async_trait]
-impl Platform for PolymarketPlatform {
-    // const ENDPOINT: &'static str = "https://clob.polymarket.com/markets";
-    const ENDPOINT: &'static str = "https://clob.polymarket.com/sampling-simplified-markets";
-
-    type Market = PolymarketMarket;
+impl Platform for MetaculusPlatform {
+    const ENDPOINT: &'static str = "https://www.metaculus.com/api2/questions/";
+    type Market = MetaculusMarket;
 
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
         let limit = builder.limit;
-        let markets: Vec<Self::Market> = vec![];
+        let markets: Vec<Self::Market> = Vec::new();
         let response = builder
             .client
-            .get(format!("{url}"))
-            .headers(get_headers())
+            .get(format!("{url}?limit={}", limit.to_string().as_str()))
             // .query(&("limit", builder.limit.to_string().as_str()))
             // .query(&["limit", builder.limit.to])
             .send()
             // .await?
             // .json::<Vec<Self::Market>>()
-            .await?;
+            .await;
+        let market_text = response.unwrap().text().await;
+        tracing::debug!("Response : {:?}", market_text);
 
-        let markets_text = response.text().await.unwrap();
-        // let markets = parse_polymarket_text(&markets_text);
-        tracing::info!("Market: {:?}", markets_text);
-
+        // let results = market_text.unwrap().parse::<Vec<Self::Market>>();
+        // let markets: Vec<Self::Market> = serde_json::from_str(&text).unwrap();
         Ok(markets)
     }
 

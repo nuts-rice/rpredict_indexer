@@ -1,3 +1,6 @@
+use std::fmt::Debug;
+
+use api::Platform;
 use async_graphql::*;
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
 use axum::{
@@ -6,6 +9,7 @@ use axum::{
     routing::get,
     Router,
 };
+use db::manifold::ManifoldMarket;
 use serde::Deserialize;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod api;
@@ -13,6 +17,8 @@ pub mod db;
 pub mod server;
 pub mod types;
 pub use db::*;
+
+use crate::metaculus::MetaculusMarket;
 const MANIFOLD_ENDPOINT: &str = "https://api.manifold.markets/v0/markets";
 #[derive(Debug, Deserialize, Default)]
 pub struct Pagiation {
@@ -34,14 +40,89 @@ async fn handler() -> Html<&'static str> {
          ",
     )
 }
-async fn markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
+
+async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
+    let pagiation = pagiation.unwrap_or_default();
+    let offset = pagiation.offset.unwrap_or(0);
+    let limit = pagiation.limit.unwrap_or(10);
+    let manifold = api::manifold::ManifoldPlatform::builder()
+        .build()
+        .fetch_questions()
+        .await
+        .expect(">_< error");
+    match manifold.first() {
+        Some(question) => {
+            tracing::info!("question: {:#?}", question);
+        }
+        None => {
+            tracing::info!("no questions found");
+        }
+    }
+    let page = render_markets(manifold, offset, limit).await;
+    page
+    // let client = api::APIClient::new(MANIFOLD_ENDPOINT).unwrap();
+    // let questions = client.fetch_page(limit as u32).await.unwrap();
+    // let html: Html<String> = format!(
+    //     r#"
+    //         <h1>Manifold Markets</h1>
+    //         <section>
+    //         <h2>Latest Markets</h2>
+    //         {:?}
+    //     "#,
+    //     &json
+    // )
+    // .into();
+}
+
+async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usize) -> Html<String> {
+    let page_length = markets.len() / limit;
+    let mut page = 0;
+    let mut html = String::new();
+    for i in 0..page_length {
+        let question_card: String = format!(
+            r#"
+            <div>
+        <h2>{} </h2>
+        </div>
+        "#,
+            &markets[i]
+        )
+        .into();
+        html.push_str(&question_card);
+    }
+    Html(html)
+}
+
+async fn polymarket_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
+    let pagiation = pagiation.unwrap_or_default();
+    let questions = api::polymarket::PolymarketPlatform::builder()
+        .build()
+        .fetch_questions()
+        .await
+        .expect(">_< error");
+    match questions.first() {
+        Some(question) => {
+            tracing::info!("question: {:#?}", question);
+        }
+        None => {
+            tracing::info!("no questions found");
+        }
+    }
+
+    Json(questions)
+}
+
+async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
     let pagiation = pagiation.unwrap_or_default();
     let offset = pagiation.offset.unwrap_or(0).to_be_bytes();
-    let limit = pagiation.limit.unwrap_or(10).to_be_bytes();
-    let client = api::APIClient::new(MANIFOLD_ENDPOINT).unwrap();
-    let questions = client.fetch_page(10).await.unwrap();
-    
-    Json(questions)
+    let limit = pagiation.limit.unwrap_or(10);
+    let metaculus_json = api::metaculus::MetaculusPlatform::builder()
+        .build()
+        .fetch_json()
+        .await
+        .expect(">_< error");
+    let markets: MetaculusMarket = MetaculusMarket::from(metaculus_json);
+    Json(markets)
 }
 
 #[tokio::main]
@@ -65,7 +146,9 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(handler))
-        .route("/markets", get(markets_index))
+        .route("/manifold_markets", get(manifold_markets_index))
+        .route("/metaculus_markets", get(metaculus_markets_index))
+        .route("/polymarket_markets", get(polymarket_markets_index))
         .route(
             "/graphql",
             get(build_graphql).post_service(GraphQL::new(question_schema.clone())),
@@ -78,8 +161,6 @@ async fn main() {
         .unwrap();
     tracing::debug!("listening on 127.0.0.1:3010");
     let client = api::APIClient::new(MANIFOLD_ENDPOINT).unwrap();
-
-    let questions = client.fetch_page(10).await.unwrap();
 
     // .unwrap();
     // tracing::debug!("questions: {:#?}", questions[0]);
