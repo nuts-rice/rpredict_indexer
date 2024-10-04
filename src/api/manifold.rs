@@ -1,4 +1,3 @@
-use std::str::FromStr;
 
 use super::Result;
 use super::{Platform, PlatformBuilder};

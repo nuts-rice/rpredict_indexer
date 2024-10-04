@@ -39,7 +39,7 @@ pub struct BetPool {
 impl fmt::Display for ManifoldMarket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.outcomeType == OutcomeType::BINARY {
-            let question = format!("{}", self.question);
+            let question = self.question.to_string();
             let pool = self.pool.as_ref().unwrap();
             let total_pool = pool.NO + pool.YES;
             let yes_share = pool.YES / total_pool;
@@ -56,7 +56,7 @@ impl fmt::Display for ManifoldMarket {
                 write!(f, "{}...YES: {} Very unlikely", question, yes_share)
             }
         } else {
-            let question = format!("{}", self.question);
+            let question = self.question.to_string();
             write!(f, "{}...", question,)
         }
     }

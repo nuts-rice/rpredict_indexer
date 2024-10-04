@@ -20,8 +20,8 @@ pub type QuestionsSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub struct DBQuestion {
     id: async_graphql::ID,
     text: String,
-    created_time: i64,
-    close_time: i64,
+    created_time: String,
+    close_time: String,
 }
 
 #[Object]
@@ -32,10 +32,10 @@ impl DBQuestion {
     async fn text(&self) -> &str {
         &self.text
     }
-    async fn createdTime(&self) -> &i64 {
+    async fn createdTime(&self) -> &str {
         &self.created_time
     }
-    async fn closeTime(&self) -> &i64 {
+    async fn closeTime(&self) -> &str {
         &self.close_time
     }
 }
@@ -87,8 +87,8 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         text: String,
-        created_time: i64,
-        close_time: i64,
+        created_time: String,
+        close_time: String,
     ) -> ID {
         let mut questions = ctx.data_unchecked::<QuestionStorage>().lock().await;
         let entry = questions.vacant_entry();

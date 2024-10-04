@@ -1,8 +1,7 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
-use crate::polymarket::{parse_polymarket_text, PolymarketMarket};
+use crate::polymarket::PolymarketMarket;
 use async_trait::async_trait;
-use axum::extract::Json;
 
 //https://github.com/Polymarket/py-clob-client
 pub struct PolymarketPlatform(PlatformBuilder<Self>);
@@ -36,7 +35,7 @@ impl Platform for PolymarketPlatform {
         let markets: Vec<Self::Market> = vec![];
         let response = builder
             .client
-            .get(format!("{url}"))
+            .get(url.to_string())
             .headers(get_headers())
             // .query(&("limit", builder.limit.to_string().as_str()))
             // .query(&["limit", builder.limit.to])

@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use api::Platform;
 use async_graphql::*;
@@ -10,7 +10,10 @@ use axum::{
     Router,
 };
 use db::manifold::ManifoldMarket;
+use db::model::question::DBQuestion;
+use futures_util::lock::Mutex;
 use serde::Deserialize;
+use slab::Slab;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod api;
 pub mod db;
@@ -58,8 +61,8 @@ async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl Int
             tracing::info!("no questions found");
         }
     }
-    let page = render_markets(manifold, offset, limit).await;
-    page
+    
+    render_markets(manifold, offset, limit).await
     // let client = api::APIClient::new(MANIFOLD_ENDPOINT).unwrap();
     // let questions = client.fetch_page(limit as u32).await.unwrap();
     // let html: Html<String> = format!(
@@ -76,7 +79,7 @@ async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl Int
 
 async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usize) -> Html<String> {
     let page_length = markets.len() / limit;
-    let mut page = 0;
+    let page = 0;
     let mut html = String::new();
     for i in 0..page_length {
         let question_card: String = format!(
@@ -86,8 +89,7 @@ async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usiz
         </div>
         "#,
             &markets[i]
-        )
-        .into();
+        );
         html.push_str(&question_card);
     }
     Html(html)
@@ -114,7 +116,7 @@ async fn polymarket_markets_index(pagiation: Option<Query<Pagiation>>) -> impl I
 
 async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
     let pagiation = pagiation.unwrap_or_default();
-    let offset = pagiation.offset.unwrap_or(0).to_be_bytes();
+    let offset = pagiation.offset.unwrap_or(0);
     let limit = pagiation.limit.unwrap_or(10);
     let metaculus_json = api::metaculus::MetaculusPlatform::builder()
         .build()
@@ -122,11 +124,37 @@ async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl In
         .await
         .expect(">_< error");
     let markets: MetaculusMarket = MetaculusMarket::from(metaculus_json);
-    Json(markets)
+
+    
+    render_metaculus_markets(markets, offset, limit).await
+}
+
+async fn render_metaculus_markets(
+    markets: MetaculusMarket,
+    offset: usize,
+    limit: usize,
+) -> Html<String> {
+    let mut html = String::new();
+    let results = markets.results;
+    let page_length = results.len() / limit;
+    let page = 0;
+    for i in 0..page_length {
+        let question_card: String = format!(
+            r#"
+            <div>
+        <h2>{} </h2>
+        </div>
+        "#,
+            &results[i]
+        );
+        html.push_str(&question_card);
+    }
+    Html(html)
 }
 
 #[tokio::main]
 async fn main() {
+    let question_storage = Arc::new(Mutex::new(Slab::<DBQuestion>::new()));
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -155,7 +183,6 @@ async fn main() {
         )
         // .route("/questions", get(api::platform::fetch_page(MANIFOLD_ENDPOINT.parse().unwrap())))
         .route_service("/ws", GraphQLSubscription::new(question_schema));
-
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3010")
         .await
         .unwrap();

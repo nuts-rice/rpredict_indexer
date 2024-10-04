@@ -1,15 +1,14 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::str::FromStr;
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct MetaculusMarket {
-    next: Option<String>,
-    previous: Option<String>,
-    results: Vec<Results>,
+    pub results: Vec<MetaculusResults>,
     // outcomeType: OutcomeType,
     // pool: Option<BetPool>,
 }
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
-pub struct Results {
+pub struct MetaculusResults {
     title: String,
     title_short: String,
     created_time: String,
@@ -40,13 +39,19 @@ impl FromStr for MetaculusMarket {
 impl From<serde_json::Value> for MetaculusMarket {
     fn from(value: serde_json::Value) -> Self {
         let results = value["results"].clone();
-        let next = value["next"].clone();
-        let previous = value["previous"].clone();
-        let results = serde_json::from_value(results).unwrap();
-        MetaculusMarket {
-            next: next.as_str().map(|s| s.to_string()),
-            previous: previous.as_str().map(|s| s.to_string()),
-            results,
-        }
+        let results: Vec<MetaculusResults> = serde_json::from_value(results).unwrap();
+        MetaculusMarket { results }
+    }
+}
+
+impl fmt::Display for MetaculusMarket {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl fmt::Display for MetaculusResults {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
