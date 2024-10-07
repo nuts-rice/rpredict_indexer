@@ -61,3 +61,17 @@ impl fmt::Display for ManifoldMarket {
         }
     }
 }
+// impl
+// impl From<serde_json::Value> for ManifoldMarket {
+//     fn from(value: serde_json::Value) -> Self {
+
+//         let id = value["id"];
+//         let question = value["question"];
+//         let createdTime = value["createdTime"];
+//         let closeTime = value["closeTime"];
+//         let volume = value["volume"];
+//         let outcomeType = value["outcomeType"];
+//         let pool :  = value["pool"];
+//         ManifoldMarket { id, question, createdTime, closeTime,  totalLiquidity: volume , outcomeType, pool }
+//     }
+// }

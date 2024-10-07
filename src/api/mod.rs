@@ -56,6 +56,13 @@ impl APIClient {
     }
 }
 
+pub enum SortType {
+    Oldest,
+    Youngest,
+    MostVotes,
+    Popular,
+}
+
 #[async_trait]
 pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>>;
@@ -66,6 +73,7 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_json(&self) -> Result<serde_json::Value>;
     type Market;
     const ENDPOINT: &'static str;
+    const SORT: &'static str;
 }
 
 impl<P: Platform + Any> PlatformBuilder<P> {

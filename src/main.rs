@@ -53,16 +53,21 @@ async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl Int
         .fetch_questions()
         .await
         .expect(">_< error");
-    match manifold.first() {
-        Some(question) => {
-            tracing::info!("question: {:#?}", question);
-        }
-        None => {
-            tracing::info!("no questions found");
-        }
-    }
-    
-    render_markets(manifold, offset, limit).await
+    tracing::debug!("manifold: {:#?}", &manifold);
+    // match manifold.first() {
+    //     Some(question) => {
+    //         tracing::info!("question: {:#?}", question);
+    //     }
+    //     None => {
+    //         tracing::info!("no questions found");
+    //     }
+    // }
+    let page = render_markets(manifold, offset, limit).await;
+    page
+
+    // tracing::debug!("page: {:#?}", page);
+    //    page
+
     // let client = api::APIClient::new(MANIFOLD_ENDPOINT).unwrap();
     // let questions = client.fetch_page(limit as u32).await.unwrap();
     // let html: Html<String> = format!(
@@ -89,7 +94,8 @@ async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usiz
         </div>
         "#,
             &markets[i]
-        );
+        )
+        .into();
         html.push_str(&question_card);
     }
     Html(html)
@@ -125,7 +131,6 @@ async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl In
         .expect(">_< error");
     let markets: MetaculusMarket = MetaculusMarket::from(metaculus_json);
 
-    
     render_metaculus_markets(markets, offset, limit).await
 }
 

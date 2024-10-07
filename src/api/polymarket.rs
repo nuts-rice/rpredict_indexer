@@ -25,6 +25,7 @@ pub fn get_headers() -> reqwest::header::HeaderMap {
 impl Platform for PolymarketPlatform {
     // const ENDPOINT: &'static str = "https://clob.polymarket.com/markets";
     const ENDPOINT: &'static str = "https://clob.polymarket.com/sampling-simplified-markets";
+    const SORT: &'static str = "order:";
 
     type Market = PolymarketMarket;
 

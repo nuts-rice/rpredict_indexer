@@ -9,12 +9,32 @@ pub struct MetaculusMarket {
 }
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct MetaculusResults {
+    id: u32,
     title: String,
-    title_short: String,
-    created_time: String,
-    close_time: String,
-    // _type: Type,
+    created_at: String,
+    scheduled_close_time: String,
+    scheduled_resolve_time: String,
+    // question: Question,
+    nr_forecasters: u32,
+    forecasts_count: u32,
+    // type: Type,
+    //
 }
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+pub struct Question {
+    aggregations: Aggregations,
+}
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+pub struct Aggregations {
+    recently_weighted: u32,
+    metaculus_prediction: u32,
+}
+
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+pub struct Possibilities {
+    // type: Type,
+}
+
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub enum Active_State {}
 

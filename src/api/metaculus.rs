@@ -13,6 +13,8 @@ impl From<PlatformBuilder<Self>> for MetaculusPlatform {
 #[async_trait]
 impl Platform for MetaculusPlatform {
     const ENDPOINT: &'static str = "https://www.metaculus.com/api2/questions/";
+    const SORT: &'static str = "order:";
+
     type Market = MetaculusMarket;
 
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {

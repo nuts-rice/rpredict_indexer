@@ -1,4 +1,3 @@
-
 use super::Result;
 use super::{Platform, PlatformBuilder};
 use crate::model::manifold::ManifoldMarket;
@@ -14,6 +13,7 @@ impl From<PlatformBuilder<Self>> for ManifoldPlatform {
 #[async_trait]
 impl Platform for ManifoldPlatform {
     const ENDPOINT: &'static str = "https://api.manifold.markets/v0/markets";
+    const SORT: &'static str = "order:";
     type Market = ManifoldMarket;
 
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
