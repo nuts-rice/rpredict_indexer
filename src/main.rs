@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use api::Platform;
+use api::{Platform, SortType};
 use async_graphql::*;
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
 use axum::{
@@ -9,8 +9,11 @@ use axum::{
     routing::get,
     Router,
 };
-use db::manifold::ManifoldMarket;
 use db::model::question::DBQuestion;
+use db::{
+    manifold::ManifoldMarket,
+    polymarket::{PolymarketMarket, PolymarketResult},
+};
 use futures_util::lock::Mutex;
 use serde::Deserialize;
 use slab::Slab;
@@ -18,7 +21,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod api;
 pub mod db;
 pub mod server;
+pub mod strategies;
 pub mod types;
+pub mod web;
 pub use db::*;
 
 use crate::metaculus::MetaculusMarket;
@@ -105,19 +110,33 @@ async fn polymarket_markets_index(pagiation: Option<Query<Pagiation>>) -> impl I
     let pagiation = pagiation.unwrap_or_default();
     let questions = api::polymarket::PolymarketPlatform::builder()
         .build()
-        .fetch_questions()
+        .fetch_json()
         .await
         .expect(">_< error");
-    match questions.first() {
-        Some(question) => {
-            tracing::info!("question: {:#?}", question);
-        }
-        None => {
-            tracing::info!("no questions found");
-        }
-    }
+    let result = PolymarketResult::from(questions);
+    render_polymarket(result, 0, 10).await
 
-    Json(questions)
+    // Json(questions)
+}
+
+async fn render_polymarket(results: PolymarketResult, offset: usize, limit: usize) -> Html<String> {
+    let mut html = String::new();
+    let markets = results.data;
+    let page_length = markets.len() / limit;
+    let page = 0;
+    for i in 0..page_length {
+        let question_card: String = format!(
+            r#"
+            <div>
+        <h2>{} </h2>
+        </div>
+        "#,
+            &markets[i]
+        )
+        .into();
+        html.push_str(&question_card);
+    }
+    Html(html)
 }
 
 async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
@@ -157,9 +176,12 @@ async fn render_metaculus_markets(
     Html(html)
 }
 
+// async fn markets_index(Option<Query<Pagiation>>, sort: Option<Query<SortType>>) -> impl IntoResponse {
+//         let
+// }
+
 #[tokio::main]
 async fn main() {
-    let question_storage = Arc::new(Mutex::new(Slab::<DBQuestion>::new()));
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -192,7 +214,6 @@ async fn main() {
         .await
         .unwrap();
     tracing::debug!("listening on 127.0.0.1:3010");
-    let client = api::APIClient::new(MANIFOLD_ENDPOINT).unwrap();
 
     // .unwrap();
     // tracing::debug!("questions: {:#?}", questions[0]);

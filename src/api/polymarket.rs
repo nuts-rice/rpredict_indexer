@@ -68,4 +68,8 @@ impl Platform for PolymarketPlatform {
             .expect("Failed to parse JSON response");
         Ok(response)
     }
+
+    async fn build_order(&self, token: &str, amount: f64, nonce: &str) {
+        unimplemented!()
+    }
 }

@@ -32,3 +32,28 @@ pub struct BetPool {
     NO: f32,
     YES: f32,
 }
+
+#[derive(Deserialize, Debug, Serialize)]
+pub enum StrategyType {
+    ARBITRAGE,
+    MARKETMAKING,
+}
+
+#[derive(Deserialize, Debug, Serialize)]
+pub struct StrategyConfig {
+    id: String,
+    strategy_type: StrategyType,
+    enabled: bool,
+    period: i32,
+}
+
+impl Default for StrategyConfig {
+    fn default() -> Self {
+        Self {
+            id: "default".to_string(),
+            strategy_type: StrategyType::ARBITRAGE,
+            enabled: true,
+            period: 60,
+        }
+    }
+}

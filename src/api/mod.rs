@@ -27,35 +27,6 @@ pub struct ConnectionParams {}
 
 pub struct RequestChannels {}
 
-pub struct APIClient {
-    client: reqwest::Client,
-    endpoint: String,
-}
-
-impl APIClient {
-    pub fn new(endpoint: &str) -> Result<Self> {
-        Ok(Self {
-            client: reqwest::Client::new(),
-            endpoint: endpoint.to_string(),
-        })
-    }
-    pub async fn fetch_page(&self, limit: u32) -> Result<Vec<Question>> {
-        let url = format!("{}?limit={}", self.endpoint, limit);
-        let res = reqwest::get(url.clone()).await?.text().await?;
-        tracing::debug!("response: {:?}", res);
-        let markets: Vec<Question> = serde_json::from_str(&res)?;
-        tracing::debug!("markets: {:?}", markets[0]);
-        Ok(markets)
-    }
-    pub async fn fetch_questions(&self) -> Result<Vec<Question>> {
-        unimplemented!()
-    }
-
-    pub async fn build(&self) -> Result<()> {
-        unimplemented!()
-    }
-}
-
 pub enum SortType {
     Oldest,
     Youngest,
@@ -71,6 +42,7 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     }
     async fn fetch_question_by_id(&self, id: &str) -> Result<Question>;
     async fn fetch_json(&self) -> Result<serde_json::Value>;
+    async fn build_order(&self, token: &str, amount: f64, nonce: &str);
     type Market;
     const ENDPOINT: &'static str;
     const SORT: &'static str;

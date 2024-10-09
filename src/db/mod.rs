@@ -8,7 +8,7 @@ use question::{MutationRoot, QueryRoot, QuestionStorage, SubscriptionRoot};
 pub enum DbType {
     GraphQL,
 }
-pub type Db = sled::Db;
+pub type MarketsDb = sled::Db;
 
 pub async fn build_graphql() -> impl IntoResponse {
     let response = response::Html(
