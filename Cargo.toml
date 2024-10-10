@@ -4,12 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ansi_term = { version = "0.12.1", features = ["derive_serde_style", "serde"] }
 async-graphql = "7.0.9"
 async-graphql-axum = "7.0.9"
 async-trait = "0.1.83"
 axum = "0.7.5"
 axum-extra = { version = "0.9.3", features = ["query"] }
 axum-server = "0.7.1"
+chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.20", features = ["derive"] }
 futures-channel = "0.3.30"
 futures-util = "0.3.30"

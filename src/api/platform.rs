@@ -1,5 +1,38 @@
 use serde::Deserialize;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+use crate::api::PlatformType;
+use crate::api::{
+    manifold::ManifoldPlatform, metaculus::MetaculusPlatform, polymarket::PolymarketPlatform,
+};
+
+use super::Platform;
+
+// pub async fn run(
+//     platform_type : Option<PlatformType>)  {
+//     match platform_type {
+//         Some(PlatformType::Polymarket) => {
+//             let platform = PolymarketPlatform::builder().build();
+//         },
+//         Some(PlatformType::Manifold) => {
+//             let platform = ManifoldPlatform::builder().build();
+//         },
+//         Some(PlatformType::Metaculus) => {
+//             let platform = MetaculusPlatform::builder().build();
+//         },
+
+//         None => {
+//             let platform = PolymarketPlatform::builder().build();
+//         }
+//     };
+//     tokio::spawn(async move {
+//         match (&platform_type)  {
+//             (PlatformType::Polymarket) =>  {
+//                 PolymarketPlatform::builder().build().fetch_json().await;
+//             }
+//         }
+//     })
+
+// }
 
 // async fn markets_service(_: )
 pub async fn fetch_page(endpoint: &str) -> Result<String> {

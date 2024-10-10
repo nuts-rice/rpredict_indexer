@@ -1,7 +1,5 @@
+use super::*;
 use core::fmt;
-
-use serde::{Deserialize, Serialize};
-
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 enum OutcomeType {
     BINARY,
@@ -13,8 +11,14 @@ enum OutcomeType {
 pub struct ManifoldMarket {
     question: String,
     id: String,
-    createdTime: i64,
-    closeTime: i64,
+    #[serde(with = "ts_milliseconds")]
+    createdTime: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds_option")]
+    #[serde(default)]
+    closeTime: Option<DateTime<Utc>>,
+    #[serde(with = "ts_milliseconds_option")]
+    #[serde(default)]
+    resolutionTime: Option<DateTime<Utc>>,
     totalLiquidity: Option<f32>,
     outcomeType: OutcomeType,
     pool: Option<BetPool>,

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use clap::{Arg, Parser};
 use std::any::Any;
 pub use tokio::sync::{broadcast, mpsc, watch};
 pub mod index;
@@ -34,6 +35,12 @@ pub enum SortType {
     Popular,
 }
 
+pub enum PlatformType {
+    Polymarket,
+    Metaculus,
+    Manifold,
+}
+
 #[async_trait]
 pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>>;
@@ -43,6 +50,7 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_question_by_id(&self, id: &str) -> Result<Question>;
     async fn fetch_json(&self) -> Result<serde_json::Value>;
     async fn build_order(&self, token: &str, amount: f64, nonce: &str);
+
     type Market;
     const ENDPOINT: &'static str;
     const SORT: &'static str;
@@ -70,6 +78,7 @@ impl<P: Platform + Any> PlatformBuilder<P> {
     pub fn build(self) -> P {
         P::from(self)
     }
+
 }
 
 impl<P: Platform + Any> Default for PlatformBuilder<P> {
@@ -77,3 +86,6 @@ impl<P: Platform + Any> Default for PlatformBuilder<P> {
         Self::new()
     }
 }
+
+#[derive(Parser, Debug)]
+pub struct Args {}
