@@ -1,7 +1,9 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
+use crate::metaculus::MetaculusEvent;
 use crate::model::metaculus::MetaculusMarket;
 use async_trait::async_trait;
+use axum::extract::Query;
 pub struct MetaculusPlatform(PlatformBuilder<Self>);
 
 impl From<PlatformBuilder<Self>> for MetaculusPlatform {
@@ -16,7 +18,7 @@ impl Platform for MetaculusPlatform {
     const SORT: &'static str = "order:";
 
     type Market = MetaculusMarket;
-
+    type Event = MetaculusEvent;
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
@@ -56,6 +58,21 @@ impl Platform for MetaculusPlatform {
         Ok(response)
     }
     async fn build_order(&self, token: &str, amount: f64, nonce: &str) {
+        unimplemented!()
+    }
+    async fn fetch_ratelimited(
+        request_count: usize,
+        interval_ms: Option<u64>,
+    ) -> PlatformBuilder<Self> {
+        unimplemented!()
+    }
+    async fn fetch_json_by_description(&self, description: &str) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
+
+    async fn fetch_events(
+        pagiation: Option<Query<crate::api::index::Pagiation>>,
+    ) -> Result<Vec<Self::Event>> {
         unimplemented!()
     }
 }

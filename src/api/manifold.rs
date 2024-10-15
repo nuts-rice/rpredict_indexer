@@ -1,7 +1,9 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
+use crate::manifold::ManifoldEvent;
 use crate::model::manifold::ManifoldMarket;
 use async_trait::async_trait;
+use axum::extract::Query;
 pub struct ManifoldPlatform(PlatformBuilder<Self>);
 
 impl From<PlatformBuilder<Self>> for ManifoldPlatform {
@@ -15,7 +17,7 @@ impl Platform for ManifoldPlatform {
     const ENDPOINT: &'static str = "https://api.manifold.markets/v0/markets";
     const SORT: &'static str = "order:";
     type Market = ManifoldMarket;
-
+    type Event = ManifoldEvent;
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
@@ -50,6 +52,21 @@ impl Platform for ManifoldPlatform {
         Ok(response)
     }
     async fn build_order(&self, token: &str, amount: f64, nonce: &str) {
+        unimplemented!()
+    }
+    async fn fetch_ratelimited(
+        request_count: usize,
+        interval_ms: Option<u64>,
+    ) -> PlatformBuilder<Self> {
+        unimplemented!()
+    }
+    async fn fetch_json_by_description(&self, description: &str) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
+
+    async fn fetch_events(
+        pagiation: Option<Query<crate::api::index::Pagiation>>,
+    ) -> Result<Vec<Self::Event>> {
         unimplemented!()
     }
 }

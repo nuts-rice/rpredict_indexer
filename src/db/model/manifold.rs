@@ -24,6 +24,8 @@ pub struct ManifoldMarket {
     pool: Option<BetPool>,
 }
 
+#[derive(Deserialize, Debug, Serialize, Clone)]
+pub struct ManifoldEvent {}
 // #[derive(Deserialize, Debug, Serialize)]
 // pub struct Indicators {
 //     num_forecasts: i32,

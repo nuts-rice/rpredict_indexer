@@ -9,12 +9,14 @@ use axum::{
     routing::get,
     Router,
 };
+use clap::Parser;
 use db::model::question::DBQuestion;
 use db::{
     manifold::ManifoldMarket,
     polymarket::{PolymarketMarket, PolymarketResult},
 };
-use futures_util::lock::Mutex;
+use executor::{Executor, ExecutorType, PolymarketExecutor, Promptor};
+use futures_util::{future::OkInto, lock::Mutex};
 use serde::Deserialize;
 use slab::Slab;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -200,6 +202,24 @@ async fn main() {
     .finish();
 
     tracing::debug!("connecting to graphql");
+    let executor =
+        PolymarketExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Polymarket).build();
+    let result = executor
+        .init(
+            "What is the probability of Joe Biden winning the 2024 US elections?",
+            "Joe Biden is the current president of the United States of America",
+            "Joe Biden winning the 2024 US elections",
+        )
+        .await
+        .unwrap();
+
+    // let cli = commands::commands::Cli::parse();
+    //     match &cli.command {
+    //         commands::commands::Commands::AskSuperforecaster { question_title, description, outcome } => {
+    //             let _ = executor::PolymarketExecutor::builder(1000, 1000, executor::Promptor {  }, executor::ExecutorType::Polymarket).build().init(question_title.clone().unwrap().as_str(), description.clone().unwrap().as_str(), outcome.clone().unwrap().as_str());
+    //         },
+    //         _ => {}
+    //     }
 
     let app = Router::new()
         .route("/", get(handler))
@@ -220,4 +240,11 @@ async fn main() {
     // .unwrap();
     // tracing::debug!("questions: {:#?}", questions[0]);
     axum::serve(listener, app).await.unwrap();
+    // let cli = commands::commands::Cli::parse();
+    // match &cli.command {
+    //     commands::commands::Commands::AskSuperforecaster { question_title, description, outcome } => {
+    //         let _ = executor::PolymarketExecutor::builder(1000, 1000, executor::Promptor {  }, executor::ExecutorType::Polymarket).build().init(question_title.clone().unwrap().as_str(), description.clone().unwrap().as_str(), outcome.clone().unwrap().as_str());
+    //     },
+    //     _ => {}
+    // }
 }

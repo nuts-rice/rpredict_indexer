@@ -82,12 +82,12 @@ struct PricesHistoryPoint {
 //     winner: bool,
 // }
 //
-impl FromStr for PolymarketMarket {
-    type Err = serde_json::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s)
-    }
-}
+// impl FromStr for PolymarketMarket {
+//     type Err = serde_json::Error;
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         serde_json::from_str(s)
+//     }
+// }
 
 pub fn parse_polymarket_text(text: &str) -> Json<Vec<PolymarketMarket>> {
     let markets = serde_json::from_str(text).unwrap();

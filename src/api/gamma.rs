@@ -1,12 +1,15 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
-use crate::polymarket::{PolymarketEvent, PolymarketMarket};
+use crate::gamma::GammaMarket;
+use crate::index::Pagiation;
+use crate::polymarket::PolymarketMarket;
 use async_trait::async_trait;
 use axum::extract::Query;
-//https://github.com/Polymarket/py-clob-client
-pub struct PolymarketPlatform(PlatformBuilder<Self>);
 
-impl From<PlatformBuilder<Self>> for PolymarketPlatform {
+//https://github.com/Polymarket/py-clob-client
+pub struct GammaPlatform(PlatformBuilder<Self>);
+
+impl From<PlatformBuilder<Self>> for GammaPlatform {
     fn from(value: PlatformBuilder<Self>) -> Self {
         Self(value)
     }
@@ -22,13 +25,14 @@ pub fn get_headers() -> reqwest::header::HeaderMap {
 }
 
 #[async_trait]
-impl Platform for PolymarketPlatform {
+impl Platform for GammaPlatform {
     // const ENDPOINT: &'static str = "https://clob.polymarket.com/markets";
-    const ENDPOINT: &'static str = "https://clob.polymarket.com/sampling-simplified-markets";
+    const ENDPOINT: &'static str = "https://gamma-api.polymarket.com/markets";
     const SORT: &'static str = "order:";
 
-    type Market = PolymarketMarket;
-    type Event = PolymarketEvent;
+    type Market = GammaMarket;
+    type Event = crate::db::gamma::GammaEvent;
+
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
@@ -87,5 +91,18 @@ impl Platform for PolymarketPlatform {
         pagiation: Option<Query<crate::api::index::Pagiation>>,
     ) -> Result<Vec<Self::Event>> {
         unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[tokio::test]
+    async fn test_fetch_questions() {
+        let platform = GammaPlatform::from(PlatformBuilder::default());
+        let questions = platform.fetch_json().await.unwrap();
+        println!("Questions: {:?}", questions);
+
+        // assert!(questions.len() > 0);
     }
 }

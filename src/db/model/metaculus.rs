@@ -36,6 +36,9 @@ pub struct Possibilities {
 }
 
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+pub struct MetaculusEvent {}
+
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub enum Active_State {}
 
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]

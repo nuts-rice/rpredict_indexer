@@ -1,8 +1,11 @@
 use super::simplebroker::SimpleBroker;
+use crate::StandardMarket;
 use async_graphql::*;
+use chrono::{DateTime, Utc};
 use futures_util::{lock::Mutex, Stream, StreamExt};
 use slab::Slab;
 use std::sync::Arc;
+use uuid::Uuid;
 // use crate::db::Db;
 pub struct Indicators {
     num_forecasts: i32,
@@ -19,25 +22,40 @@ pub type QuestionsSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 #[derive(Debug, Clone)]
 pub struct DBQuestion {
     id: async_graphql::ID,
-    text: String,
-    created_time: String,
-    close_time: String,
+    pub title: String,
+    pub platform: String,
+    pub platform_id: String,
+    pub open_time: String,
+    pub close_time: String,
+    pub volume_usd: f32,
+    pub num_traders: i32,
+    pub category: String,
+    pub resolution: f32,
+    pub prob_midpoint: f32,
+    pub prob_close: f32,
+    pub prob_tma: f32,
 }
 
 #[Object]
 impl DBQuestion {
-    async fn id(&self) -> &ID {
+    pub async fn id(&self) -> &ID {
         &self.id
     }
-    async fn text(&self) -> &str {
-        &self.text
+    pub async fn title(&self) -> &str {
+        &self.title
     }
-    async fn createdTime(&self) -> &str {
-        &self.created_time
+    pub async fn open_time(&self) -> &str {
+        &self.open_time
     }
-    async fn closeTime(&self) -> &str {
+    pub async fn close_time(&self) -> &str {
         &self.close_time
     }
+    pub async fn volume_usd(&self) -> f32 {
+        self.volume_usd
+    }
+    // pub async fn closeTime(&self) -> &str {
+    //     &self.close_time
+    // }
 }
 
 pub type QuestionStorage = Arc<Mutex<Slab<DBQuestion>>>;
@@ -86,18 +104,36 @@ impl MutationRoot {
     async fn add_question(
         &self,
         ctx: &Context<'_>,
-        text: String,
-        created_time: String,
+        title: String,
+        open_time: String,
         close_time: String,
+        category: String,
+        platform: String,
+        volume_usd: f32,
+        num_traders: i32,
+        platform_id: String,
+        prob_close: f32,
+        prob_tma: f32,
+        prob_midpoint: f32,
+        resolution: f32,
     ) -> ID {
         let mut questions = ctx.data_unchecked::<QuestionStorage>().lock().await;
         let entry = questions.vacant_entry();
         let id: ID = entry.key().into();
         let question = DBQuestion {
             id: id.clone(),
-            text,
-            created_time,
+            title,
+            open_time,
             close_time,
+            category,
+            platform,
+            volume_usd,
+            num_traders,
+            platform_id,
+            prob_close,
+            prob_midpoint,
+            prob_tma,
+            resolution,
         };
         questions.insert(question);
         SimpleBroker::publish(QuestionChanged {
@@ -135,5 +171,26 @@ impl SubscriptionRoot {
             };
             async move { res }
         })
+    }
+}
+
+impl From<&StandardMarket> for DBQuestion {
+    fn from(value: &StandardMarket) -> Self {
+        DBQuestion {
+            //TODO: Change ID to be a unique identifier
+            id: async_graphql::ID::from(uuid::Uuid::new_v4().to_string().as_str()),
+            title: value.title.clone(),
+            platform: value.platform.clone(),
+            platform_id: value.platform_id.clone(),
+            open_time: value.open_time.to_string(),
+            close_time: value.close_time.to_string(),
+            volume_usd: value.volume_usd,
+            num_traders: value.num_traders,
+            category: value.category.clone(),
+            resolution: value.resolution,
+            prob_midpoint: value.prob_midpoint,
+            prob_close: value.prob_close,
+            prob_tma: value.prob_tma,
+        }
     }
 }
