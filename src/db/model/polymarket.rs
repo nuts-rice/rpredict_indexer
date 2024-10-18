@@ -1,8 +1,8 @@
 use super::*;
 use axum::Json;
 use core::fmt;
+use serde::{de, Deserializer};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PolymarketResult {
@@ -12,17 +12,26 @@ pub struct PolymarketResult {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PolymarketMarket {
-    active: bool,
-    description: Option<String>,
-    question: Option<String>,
-    question_id: Option<String>,
+    pub active: bool,
+    pub question: String,
+    #[serde(rename = "questionId")]
+    pub question_id: Option<String>,
+    #[serde(deserialize_with = "deserialize_into_string_array")]
+    pub outcomes: [String; 2],
     accepting_orders: bool,
+    #[serde(deserialize_with = "deserialize_outcome_prices")]
+    pub outcome_prices: Option<[f64; 2]>,
     // category: String,
     // is_50_50_outcome: bool,
-    tokens: Option<Vec<PolymarketToken>>,
-    rewards: Option<PolymarketRewards>,
-    events: Option<Vec<PolymarketEvent>>,
+    #[serde(deserialize_with = "deserialize_into_string_array")]
+    pub clob_token_ids: [String; 2],
+    pub spread: f64,
+    pub order_price_min_tick_size: f64,
+    // tokens: Option<Vec<PolymarketToken>>,
+    // rewards: Option<PolymarketRewards>,
+    // events: Option<Vec<PolymarketEvent>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -50,19 +59,13 @@ pub struct PolymarketRates {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PolymarketEvent {
-    id: String,
-    ticker: Option<String>,
-    title: Option<String>,
-    start_date: Option<String>,
-    end_date: Option<String>,
-    liquidity: Option<f64>,
-    volume: Option<f64>,
-    markets: Option<Vec<PolymarketMarket>>,
-    active: Option<bool>,
-    closed: Option<bool>,
-    restricted: Option<bool>,
-    order_min_size: Option<i32>,
+    pub id: String,
+    pub title: String,
+    pub markets: Vec<PolymarketMarket>,
+    pub slug: String,
+    pub neg_risk: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -70,6 +73,39 @@ struct PricesHistoryPoint {
     #[serde(with = "ts_seconds")]
     timestamp: DateTime<Utc>,
     price: f64,
+}
+
+fn deserialize_outcome_prices<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<[f64; 2]>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_s: Option<String> = Option::deserialize(deserializer)?;
+
+    match opt_s {
+        Some(s) => {
+            let vec_str: Vec<String> =
+                serde_json::from_str(&s).map_err(|err| de::Error::custom(err.to_string()))?;
+
+            if vec_str.len() != 2 {
+                return Err(de::Error::invalid_length(
+                    vec_str.len(),
+                    &"expected an array of length 2",
+                ));
+            }
+
+            let mut vec_f64 = [0.0; 2];
+            for (i, val_str) in vec_str.iter().enumerate() {
+                vec_f64[i] = val_str
+                    .parse::<f64>()
+                    .map_err(|e| de::Error::custom(e.to_string()))?;
+            }
+
+            Ok(Some(vec_f64))
+        }
+        None => Ok(None),
+    }
 }
 
 // type PolymarketToken = HashMap<>
@@ -95,15 +131,26 @@ pub fn parse_polymarket_text(text: &str) -> Json<Vec<PolymarketMarket>> {
     Json(markets)
 }
 
+impl PolymarketEvent {
+    pub fn get_url(&self) -> String {
+        format!("https://polymarket.com/event/{}", self.slug)
+    }
+}
+
+impl std::fmt::Display for PolymarketEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.title, self.get_url(),)
+    }
+}
 impl fmt::Display for PolymarketMarket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
-impl From<serde_json::Value> for PolymarketResult {
-    fn from(value: serde_json::Value) -> Self {
-        let data = value["data"].clone();
-        let next_cursor = value["next_cursor"].to_string().clone();
+impl From<Vec<serde_json::Value>> for PolymarketResult {
+    fn from(value: Vec<serde_json::Value>) -> Self {
+        let data = value[0]["data"].clone();
+        let next_cursor = value[0]["next_cursor"].to_string().clone();
 
         let markets: Vec<PolymarketMarket> = serde_json::from_value(data).unwrap();
         PolymarketResult {
@@ -111,4 +158,25 @@ impl From<serde_json::Value> for PolymarketResult {
             data: markets,
         }
     }
+}
+
+fn deserialize_into_string_array<'de, D>(
+    deserializer: D,
+) -> std::result::Result<[String; 2], D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+
+    let vec: Vec<String> =
+        serde_json::from_str(&s).map_err(|err| de::Error::custom(err.to_string()))?;
+
+    if vec.len() != 2 {
+        return Err(de::Error::invalid_length(
+            vec.len(),
+            &"expected an array of length 2",
+        ));
+    }
+
+    Ok([vec[0].clone(), vec[1].clone()])
 }

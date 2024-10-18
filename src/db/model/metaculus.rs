@@ -59,9 +59,9 @@ impl FromStr for MetaculusMarket {
     }
 }
 
-impl From<serde_json::Value> for MetaculusMarket {
-    fn from(value: serde_json::Value) -> Self {
-        let results = value["results"].clone();
+impl From<Vec<serde_json::Value>> for MetaculusMarket {
+    fn from(value: Vec<serde_json::Value>) -> Self {
+        let results = value[0]["results"].clone();
         let results: Vec<MetaculusResults> = serde_json::from_value(results).unwrap();
         MetaculusMarket { results }
     }

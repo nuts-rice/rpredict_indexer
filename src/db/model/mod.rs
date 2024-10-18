@@ -1,7 +1,5 @@
-use std::ops::Deref;
-
 use chrono::serde::{ts_milliseconds, ts_milliseconds_option, ts_seconds};
-use chrono::{DateTime, Duration, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use self::metaculus::MetaculusMarket;
@@ -86,7 +84,7 @@ async fn store_markets(markets: Vec<StandardMarket>, db: axum::extract::State<Qu
     for chunk in markets.chunks(1000) {
         for market in chunk {
             let key = format!("market:{}", market.platform_id);
-            let value: DBQuestion = DBQuestion::from(market.clone());
+            let value: DBQuestion = DBQuestion::from(market);
             db.insert(value);
         }
     }

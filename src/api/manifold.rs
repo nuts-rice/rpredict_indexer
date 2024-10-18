@@ -3,7 +3,6 @@ use super::{Platform, PlatformBuilder};
 use crate::manifold::ManifoldEvent;
 use crate::model::manifold::ManifoldMarket;
 use async_trait::async_trait;
-use axum::extract::Query;
 pub struct ManifoldPlatform(PlatformBuilder<Self>);
 
 impl From<PlatformBuilder<Self>> for ManifoldPlatform {
@@ -34,11 +33,14 @@ impl Platform for ManifoldPlatform {
         let markets: Vec<Self::Market> = serde_json::from_str(&text).unwrap();
         Ok(markets)
     }
-
-    async fn fetch_question_by_id(&self, id: &str) -> Result<crate::types::Question> {
+    async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>> {
         unimplemented!()
     }
-    async fn fetch_json(&self) -> Result<serde_json::Value> {
+
+    async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {
+        unimplemented!()
+    }
+    async fn fetch_json(&self) -> Result<Vec<serde_json::Value>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
         let response = builder
@@ -60,13 +62,60 @@ impl Platform for ManifoldPlatform {
     ) -> PlatformBuilder<Self> {
         unimplemented!()
     }
-    async fn fetch_json_by_description(&self, description: &str) -> Result<serde_json::Value> {
+    async fn fetch_json_by_description(&self, term: &str) -> Result<Vec<serde_json::Value>> {
+        let builder = &self.0;
+        let url = format!(
+            "https://api.manifold.markets/v0/search-markets?term={}&filter=open",
+            term
+        );
+        let response = builder
+            .client
+            .get(url)
+            .send()
+            .await?
+            .json()
+            .await
+            .expect("Failed to parse JSON response");
+        Ok(response)
+    }
+    async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>> {
         unimplemented!()
     }
-
-    async fn fetch_events(
-        pagiation: Option<Query<crate::api::index::Pagiation>>,
-    ) -> Result<Vec<Self::Event>> {
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>> {
         unimplemented!()
+    }
+}
+
+mod tests {
+    use super::*;
+    use tracing_subscriber::prelude::*;
+    #[tokio::test]
+    async fn test_manifold_markets() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
+        let mut manifold = ManifoldPlatform::from(PlatformBuilder::new());
+        manifold.0.limit(15);
+        let questions = manifold.fetch_questions().await.unwrap();
+        tracing::debug!("Questions: {:?}", questions);
+    }
+    #[tokio::test]
+    async fn test_manifold_search() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        let mut manifold = ManifoldPlatform::from(PlatformBuilder::new());
+        manifold.0.limit(15);
+        let questions = manifold.fetch_json_by_description("crispr").await.unwrap();
+        tracing::debug!("Questions: {:?}", questions);
     }
 }

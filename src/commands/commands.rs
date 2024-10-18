@@ -1,5 +1,5 @@
 use super::Result;
-use clap::{Arg, Command, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(version, about)]

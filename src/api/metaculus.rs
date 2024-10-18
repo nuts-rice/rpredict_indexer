@@ -3,7 +3,6 @@ use super::{Platform, PlatformBuilder};
 use crate::metaculus::MetaculusEvent;
 use crate::model::metaculus::MetaculusMarket;
 use async_trait::async_trait;
-use axum::extract::Query;
 pub struct MetaculusPlatform(PlatformBuilder<Self>);
 
 impl From<PlatformBuilder<Self>> for MetaculusPlatform {
@@ -41,10 +40,10 @@ impl Platform for MetaculusPlatform {
         Ok(markets)
     }
 
-    async fn fetch_question_by_id(&self, id: &str) -> Result<crate::types::Question> {
+    async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {
         unimplemented!()
     }
-    async fn fetch_json(&self) -> Result<serde_json::Value> {
+    async fn fetch_json(&self) -> Result<Vec<serde_json::Value>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
         let response = builder
@@ -66,13 +65,17 @@ impl Platform for MetaculusPlatform {
     ) -> PlatformBuilder<Self> {
         unimplemented!()
     }
-    async fn fetch_json_by_description(&self, description: &str) -> Result<serde_json::Value> {
+    async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>> {
+        unimplemented!()
+    }
+    async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>> {
         unimplemented!()
     }
 
-    async fn fetch_events(
-        pagiation: Option<Query<crate::api::index::Pagiation>>,
-    ) -> Result<Vec<Self::Event>> {
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>> {
+        unimplemented!()
+    }
+    async fn fetch_markets_by_terms(&self, term: &str) -> Result<Vec<Self::Market>> {
         unimplemented!()
     }
 }

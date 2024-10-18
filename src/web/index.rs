@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::Query,
-    response::{Html, IntoResponse, Json},
+    response::{Html, IntoResponse},
     Extension,
 };
 

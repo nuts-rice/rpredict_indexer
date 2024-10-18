@@ -1,10 +1,8 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
 use crate::gamma::GammaMarket;
-use crate::index::Pagiation;
-use crate::polymarket::PolymarketMarket;
 use async_trait::async_trait;
-use axum::extract::Query;
+use std::collections::HashMap;
 
 //https://github.com/Polymarket/py-clob-client
 pub struct GammaPlatform(PlatformBuilder<Self>);
@@ -36,6 +34,7 @@ impl Platform for GammaPlatform {
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
+
         let limit = builder.limit;
         let markets: Vec<Self::Market> = vec![];
         let response = builder
@@ -56,10 +55,27 @@ impl Platform for GammaPlatform {
         Ok(markets)
     }
 
-    async fn fetch_question_by_id(&self, id: &str) -> Result<crate::types::Question> {
-        unimplemented!()
+    async fn fetch_question_by_id(&self, token_id: &str) -> Result<Self::Market> {
+        let mut args = HashMap::new();
+        args.insert("token_id", token_id);
+        let builder = &self.0;
+        let url = builder.endpoint.as_str().to_owned() + "/" + token_id;
+        let market: Self::Market = GammaMarket {};
+
+        let response = builder
+            .client
+            .get(url)
+            // .query(&args)
+            .send()
+            .await?;
+        // .json::<Self::Market>()
+        // .await?;
+        let market_text = response.text().await.unwrap();
+        tracing::info!("Market: {:?}", market_text);
+
+        Ok(market)
     }
-    async fn fetch_json(&self) -> Result<serde_json::Value> {
+    async fn fetch_json(&self) -> Result<Vec<serde_json::Value>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
         let response = builder
@@ -77,6 +93,10 @@ impl Platform for GammaPlatform {
         unimplemented!()
     }
 
+    async fn fetch_markets_by_terms(&self, term: &str) -> Result<Vec<Self::Market>> {
+        unimplemented!()
+    }
+
     async fn fetch_ratelimited(
         request_count: usize,
         interval_ms: Option<u64>,
@@ -84,12 +104,13 @@ impl Platform for GammaPlatform {
         unimplemented!()
     }
 
-    async fn fetch_json_by_description(&self, description: &str) -> Result<serde_json::Value> {
+    async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>> {
         unimplemented!()
     }
-    async fn fetch_events(
-        pagiation: Option<Query<crate::api::index::Pagiation>>,
-    ) -> Result<Vec<Self::Event>> {
+    async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>> {
+        unimplemented!()
+    }
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>> {
         unimplemented!()
     }
 }
@@ -97,12 +118,19 @@ impl Platform for GammaPlatform {
 #[cfg(test)]
 mod test {
     use super::*;
-    #[tokio::test]
-    async fn test_fetch_questions() {
-        let platform = GammaPlatform::from(PlatformBuilder::default());
-        let questions = platform.fetch_json().await.unwrap();
-        println!("Questions: {:?}", questions);
+    // #[tokio::test]
+    // async fn test_fetch_questions() {
+    //     let platform = GammaPlatform::from(PlatformBuilder::default());
+    //     let questions = platform.fetch_json().await.unwrap();
+    //     println!("Questions: {:?}", questions);
 
-        // assert!(questions.len() > 0);
+    //     // assert!(questions.len() > 0);
+    // }
+    #[tokio::test]
+    async fn test_fetch_question_by_id() {
+        let platform = GammaPlatform::from(PlatformBuilder::default());
+        let question = platform.fetch_question_by_id("506962").await.unwrap();
+        println!("Question: {:?}", question);
+        // assert!(question.len() > 0);
     }
 }

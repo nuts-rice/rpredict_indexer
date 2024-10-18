@@ -1,15 +1,12 @@
 use async_trait::async_trait;
-use axum::extract::Query;
-use clap::{Arg, Parser};
+use clap::Parser;
 use std::any::Any;
 pub use tokio::sync::{broadcast, mpsc, watch};
 pub mod index;
 pub mod platform;
 pub mod questions;
 
-use self::index::Pagiation;
-
-use super::types::{Indicators, Question};
+use super::types::Indicators;
 
 // type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -51,15 +48,17 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     fn builder() -> PlatformBuilder<Self> {
         PlatformBuilder::new()
     }
-    async fn fetch_json_by_description(&self, description: &str) -> Result<serde_json::Value>;
-    async fn fetch_question_by_id(&self, id: &str) -> Result<Question>;
-    async fn fetch_json(&self) -> Result<serde_json::Value>;
+    async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>>;
+    async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market>;
+    async fn fetch_json(&self) -> Result<Vec<serde_json::Value>>;
     async fn build_order(&self, token: &str, amount: f64, nonce: &str);
     async fn fetch_ratelimited(
         request_count: usize,
         interval_ms: Option<u64>,
     ) -> PlatformBuilder<Self>;
-    async fn fetch_events(pagiation: Option<Query<Pagiation>>) -> Result<Vec<Self::Event>>;
+    async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>>;
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>>;
+    async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>>;
     type Market;
     type Event;
     const ENDPOINT: &'static str;
@@ -76,13 +75,17 @@ impl<P: Platform + Any> PlatformBuilder<P> {
             //100
         }
     }
+    pub fn limit(&mut self, new_limit: u32) {
+        self.limit = new_limit;
+    }
+    pub fn endpoint(&mut self, new_endpoint: &str) {
+        self.endpoint = new_endpoint.to_string();
+    }
+
     // fn build() -> Builder<Self> {
     //     unimplemented!()
     // }
     fn indicators<I: Into<Indicators>>(self, indicators: I) -> Self {
-        unimplemented!()
-    }
-    fn limit(self, limit: u32) -> Self {
         unimplemented!()
     }
     pub fn build(self) -> P {

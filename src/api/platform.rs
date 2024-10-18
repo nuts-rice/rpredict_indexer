@@ -1,9 +1,5 @@
 use serde::Deserialize;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-use crate::api::PlatformType;
-use crate::api::{
-    manifold::ManifoldPlatform, metaculus::MetaculusPlatform, polymarket::PolymarketPlatform,
-};
 
 use super::Platform;
 

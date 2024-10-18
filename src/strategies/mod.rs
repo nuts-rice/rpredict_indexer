@@ -23,6 +23,12 @@ pub trait Strategy: From<StrategyBuilder> + Any {
     async fn run(&self);
 }
 
+impl Default for StrategyBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StrategyBuilder {
     pub fn new() -> Self {
         StrategyBuilder {

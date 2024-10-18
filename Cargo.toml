@@ -29,6 +29,7 @@ serde_json = "1.0.128"
 slab = { version = "0.4.9", features = ["serde"] }
 sled = "0.34.7"
 sqlx = "0.8.2"
+tavily = "1.0.0"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["full"] }
 tokio-tungstenite = "0.24.0"

@@ -1,27 +1,40 @@
 use super::*;
 use core::fmt;
+use std::str::FromStr;
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 enum OutcomeType {
     BINARY,
     MULTIPLE_CHOICE,
     POLL,
 }
+impl FromStr for OutcomeType {
+    type Err = ();
+    fn from_str(input: &str) -> std::result::Result<OutcomeType, ()> {
+        match input {
+            "BINARY" => Ok(OutcomeType::BINARY),
+            "MULTIPLE_CHOICE" => Ok(OutcomeType::MULTIPLE_CHOICE),
+            "POLL" => Ok(OutcomeType::POLL),
+            _ => Err(()),
+        }
+    }
+}
 
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct ManifoldMarket {
-    question: String,
-    id: String,
+    pub question: String,
+    pub id: String,
     #[serde(with = "ts_milliseconds")]
-    createdTime: DateTime<Utc>,
+    pub createdTime: DateTime<Utc>,
     #[serde(with = "ts_milliseconds_option")]
     #[serde(default)]
-    closeTime: Option<DateTime<Utc>>,
+    pub closeTime: Option<DateTime<Utc>>,
     #[serde(with = "ts_milliseconds_option")]
     #[serde(default)]
-    resolutionTime: Option<DateTime<Utc>>,
-    totalLiquidity: Option<f32>,
-    outcomeType: OutcomeType,
-    pool: Option<BetPool>,
+    pub resolutionTime: Option<DateTime<Utc>>,
+    pub totalLiquidity: f64,
+    pub outcomeType: OutcomeType,
+    pub pool: Option<BetPool>,
+    pub probability: f64,
 }
 
 #[derive(Deserialize, Debug, Serialize, Clone)]
@@ -38,8 +51,8 @@ pub struct ManifoldEvent {}
 // }
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct BetPool {
-    NO: f32,
-    YES: f32,
+    NO: f64,
+    YES: f64,
 }
 
 impl fmt::Display for ManifoldMarket {
@@ -67,17 +80,43 @@ impl fmt::Display for ManifoldMarket {
         }
     }
 }
+impl From<serde_json::Value> for BetPool {
+    fn from(value: serde_json::Value) -> Self {
+        let NO = value["NO"].as_f64().unwrap();
+        let YES = value["YES"].as_f64().unwrap();
+        BetPool { NO, YES }
+    }
+}
 // impl
-// impl From<serde_json::Value> for ManifoldMarket {
-//     fn from(value: serde_json::Value) -> Self {
-
-//         let id = value["id"];
-//         let question = value["question"];
-//         let createdTime = value["createdTime"];
-//         let closeTime = value["closeTime"];
-//         let volume = value["volume"];
-//         let outcomeType = value["outcomeType"];
-//         let pool :  = value["pool"];
-//         ManifoldMarket { id, question, createdTime, closeTime,  totalLiquidity: volume , outcomeType, pool }
-//     }
-// }
+impl From<serde_json::Value> for ManifoldMarket {
+    fn from(value: serde_json::Value) -> Self {
+        let id = value["id"].to_string();
+        let question = value["question"].to_string();
+        let createdTime = value["createdTime"]
+            .to_string()
+            .parse::<DateTime<Utc>>()
+            .expect("Failed to parse created time");
+        let closeTime = value["closeTime"]
+            .to_string()
+            .parse::<DateTime<Utc>>()
+            .unwrap();
+        let volume = value["volume"].as_f64().unwrap();
+        let outcomeType = value["outcomeType"]
+            .to_string()
+            .parse::<OutcomeType>()
+            .unwrap();
+        let pool = BetPool::from(value["pool"].clone());
+        let probability = value["probability"].as_f64().unwrap();
+        ManifoldMarket {
+            id,
+            question,
+            createdTime,
+            resolutionTime: Some(closeTime),
+            closeTime: Some(closeTime),
+            probability,
+            totalLiquidity: volume,
+            outcomeType,
+            pool: Some(pool),
+        }
+    }
+}

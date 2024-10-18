@@ -1,24 +1,17 @@
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
-use api::{Platform, SortType};
+use crate::executor::executor::{Executor, ExecutorType, PolymarketExecutor, Promptor};
+use api::Platform;
 use async_graphql::*;
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
 use axum::{
     extract::Query,
-    response::{Html, IntoResponse, Json},
+    response::{Html, IntoResponse},
     routing::get,
     Router,
 };
-use clap::Parser;
-use db::model::question::DBQuestion;
-use db::{
-    manifold::ManifoldMarket,
-    polymarket::{PolymarketMarket, PolymarketResult},
-};
-use executor::{Executor, ExecutorType, PolymarketExecutor, Promptor};
-use futures_util::{future::OkInto, lock::Mutex};
+use db::{manifold::ManifoldMarket, polymarket::PolymarketResult};
 use serde::Deserialize;
-use slab::Slab;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod api;
 pub mod commands;
@@ -71,8 +64,8 @@ async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl Int
     //         tracing::info!("no questions found");
     //     }
     // }
-    let page = render_markets(manifold, offset, limit).await;
-    page
+
+    render_markets(manifold, offset, limit).await
 
     // tracing::debug!("page: {:#?}", page);
     //    page
@@ -103,8 +96,7 @@ async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usiz
         </div>
         "#,
             &markets[i]
-        )
-        .into();
+        );
         html.push_str(&question_card);
     }
     Html(html)
@@ -119,8 +111,6 @@ async fn polymarket_markets_index(pagiation: Option<Query<Pagiation>>) -> impl I
         .expect(">_< error");
     let result = PolymarketResult::from(questions);
     render_polymarket(result, 0, 10).await
-
-    // Json(questions)
 }
 
 async fn render_polymarket(results: PolymarketResult, offset: usize, limit: usize) -> Html<String> {
@@ -136,8 +126,7 @@ async fn render_polymarket(results: PolymarketResult, offset: usize, limit: usiz
         </div>
         "#,
             &markets[i]
-        )
-        .into();
+        );
         html.push_str(&question_card);
     }
     Html(html)
@@ -204,14 +193,15 @@ async fn main() {
     tracing::debug!("connecting to graphql");
     let executor =
         PolymarketExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Polymarket).build();
-    let result = executor
-        .init(
-            "What is the probability of Joe Biden winning the 2024 US elections?",
-            "Joe Biden is the current president of the United States of America",
-            "Joe Biden winning the 2024 US elections",
-        )
-        .await
-        .unwrap();
+    // let event_data =
+    // let result = executor
+    //     .init(
+    //         "What is the probability of Joe Biden winning the 2024 US elections?",
+    //         "Joe Biden is the current president of the United States of America",
+    //         "Joe Biden winning the 2024 US elections",
+    //     )
+    //     .await
+    //     .unwrap();
 
     // let cli = commands::commands::Cli::parse();
     //     match &cli.command {
