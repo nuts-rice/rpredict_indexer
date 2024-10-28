@@ -42,6 +42,11 @@ pub enum PlatformType {
     Manifold,
 }
 
+pub enum BinaryOutcome {
+    YES,
+    NO,
+}
+
 #[async_trait]
 pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>>;
@@ -51,16 +56,23 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>>;
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market>;
     async fn fetch_json(&self) -> Result<Vec<serde_json::Value>>;
-    async fn build_order(&self, token: &str, amount: f64, nonce: &str);
+    async fn build_order(
+        &self,
+        contract_id: &str,
+        amount: f64,
+        nonce: &str,
+        outcome: &str,
+    ) -> Result<()>;
     async fn fetch_ratelimited(
         request_count: usize,
         interval_ms: Option<u64>,
     ) -> PlatformBuilder<Self>;
     async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>>;
-    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>>;
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>>;
     async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>>;
     type Market;
     type Event;
+    type Position;
     const ENDPOINT: &'static str;
     const SORT: &'static str;
 }

@@ -1,6 +1,6 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
-use crate::gamma::GammaMarket;
+use crate::gamma::{GammaMarket, GammaPosition};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -25,15 +25,15 @@ pub fn get_headers() -> reqwest::header::HeaderMap {
 #[async_trait]
 impl Platform for GammaPlatform {
     // const ENDPOINT: &'static str = "https://clob.polymarket.com/markets";
-    const ENDPOINT: &'static str = "https://gamma-api.polymarket.com/markets";
+    const ENDPOINT: &'static str = "https://gamma-api.polymarket.com/";
     const SORT: &'static str = "order:";
 
     type Market = GammaMarket;
     type Event = crate::db::gamma::GammaEvent;
-
+    type Position = GammaPosition;
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
-        let url = builder.endpoint.as_str();
+        let url = builder.endpoint.to_owned() + "/markets";
 
         let limit = builder.limit;
         let markets: Vec<Self::Market> = vec![];
@@ -89,7 +89,13 @@ impl Platform for GammaPlatform {
         Ok(response)
     }
 
-    async fn build_order(&self, token: &str, amount: f64, nonce: &str) {
+    async fn build_order(
+        &self,
+        token: &str,
+        amount: f64,
+        nonce: &str,
+        outcome: &str,
+    ) -> Result<()> {
         unimplemented!()
     }
 
@@ -110,7 +116,7 @@ impl Platform for GammaPlatform {
     async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>> {
         unimplemented!()
     }
-    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>> {
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>> {
         unimplemented!()
     }
 }
@@ -132,5 +138,9 @@ mod test {
         let question = platform.fetch_question_by_id("506962").await.unwrap();
         println!("Question: {:?}", question);
         // assert!(question.len() > 0);
+    }
+    #[tokio::test]
+    async fn test_fetch_events_by_tag() {
+        unimplemented!()
     }
 }

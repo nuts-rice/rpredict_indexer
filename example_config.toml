@@ -1,0 +1,9 @@
+[rpredict]
+period = 30
+
+
+[manifold]
+questions = {"What is the probability of GPT-5 being availiable by 2025",
+             "What is the probability of Stalker 2 being released by 2025",
+             "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?"}
+

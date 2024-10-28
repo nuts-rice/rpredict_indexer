@@ -4,6 +4,7 @@ use super::StrategyBuilder;
 use crate::api::PlatformBuilder;
 use crate::strategies::Result;
 use axum::async_trait;
+use std::any::Any;
 // pub struct ArbitrageStrategy(Strategy<Self>);
 
 pub struct ArbitrageStrategy(StrategyBuilder);
@@ -15,9 +16,9 @@ impl From<StrategyBuilder> for ArbitrageStrategy {
 }
 
 #[async_trait]
-impl Strategy for ArbitrageStrategy {
+impl<P: Platform + Any + std::marker::Sync> Strategy<P> for ArbitrageStrategy {
     const INTERVAL: i32 = 60;
-    fn set_apis<T: Platform>(&mut self, api: PlatformBuilder<T>) {
+    fn set_apis(&mut self, builder: PlatformBuilder<P>) {
         unimplemented!()
     }
     fn register_markets() {
@@ -29,8 +30,14 @@ impl Strategy for ArbitrageStrategy {
     fn builder() -> StrategyBuilder {
         unimplemented!()
     }
+    async fn one_best(&self) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 async fn find_arb(buy_balance: f32, sell_balance: f32, is_source_buying: bool) -> Result<f32> {
     unimplemented!()
 }
+
+#[cfg(test)]
+mod tests {}

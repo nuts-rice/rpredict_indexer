@@ -1,6 +1,6 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
-use crate::polymarket::{PolymarketEvent, PolymarketMarket};
+use crate::polymarket::{PolymarketEvent, PolymarketMarket, PolymarketPosition};
 use async_trait::async_trait;
 use serde_json::json;
 //https://github.com/Polymarket/py-clob-client
@@ -24,11 +24,12 @@ pub fn get_headers() -> reqwest::header::HeaderMap {
 #[async_trait]
 impl Platform for PolymarketPlatform {
     // const ENDPOINT: &'static str = "https://clob.polymarket.com/markets";
-    const ENDPOINT: &'static str = "https://clob.polymarket.com";
+    const ENDPOINT: &'static str = "https://gamma-api.polymarket.com/";
     const SORT: &'static str = "order:";
 
     type Market = PolymarketMarket;
     type Event = PolymarketEvent;
+    type Position = PolymarketPosition;
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str().to_owned() + "/markets";
@@ -89,11 +90,37 @@ impl Platform for PolymarketPlatform {
         Ok(response)
     }
 
-    async fn build_order(&self, token: &str, amount: f64, nonce: &str) {
+    async fn build_order(
+        &self,
+        token: &str,
+        amount: f64,
+        nonce: &str,
+        outcome: &str,
+    ) -> Result<()> {
         unimplemented!()
     }
     async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>> {
-        unimplemented!()
+        let builder = &self.0;
+        let args: Vec<_> = [
+            ("active", "true"),
+            ("archived", "false"),
+            ("closed", "false"),
+            ("order", "volume24hr"),
+            ("ascending", "false"),
+        ]
+        .iter()
+        .map(|(arg, value)| (*arg, *value))
+        .collect();
+        let url = format!("https://gamma-api.polymarket.com/events?tag={}", terms,);
+        let response = builder
+            .client
+            .get(url)
+            // .query(&args)
+            .send()
+            .await?
+            .json::<Vec<Self::Market>>()
+            .await?;
+        Ok(response)
     }
 
     async fn fetch_ratelimited(
@@ -104,7 +131,30 @@ impl Platform for PolymarketPlatform {
     }
 
     async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>> {
-        unimplemented!()
+        let builder = &self.0;
+        let args: Vec<_> = [
+            ("active", "true"),
+            ("archived", "false"),
+            ("closed", "false"),
+            ("order", "volume24hr"),
+            ("ascending", "false"),
+        ]
+        .iter()
+        .map(|(arg, value)| (*arg, *value))
+        .collect();
+        let url = format!(
+            "https://gamma-api.polymarket.com/events?tag={}",
+            description,
+        );
+        let response = builder
+            .client
+            .get(url)
+            // .query(&args)
+            .send()
+            .await?
+            .json::<Vec<serde_json::Value>>()
+            .await?;
+        Ok(response)
     }
     async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>> {
         let offset = offset.to_string();
@@ -133,7 +183,7 @@ impl Platform for PolymarketPlatform {
             .await?;
         Ok(response)
     }
-    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<serde_json::Value>> {
+    async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>> {
         unimplemented!()
     }
 }

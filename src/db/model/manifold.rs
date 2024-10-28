@@ -1,11 +1,19 @@
 use super::*;
 use core::fmt;
+use serde::{de, Deserializer};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::str::FromStr;
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
-enum OutcomeType {
+pub enum OutcomeType {
     BINARY,
     MULTIPLE_CHOICE,
     POLL,
+    BOUNTIED_QUESTION,
+    PSEUDO_NUMERIC,
+    NUMBER,
+    STONK,
 }
 impl FromStr for OutcomeType {
     type Err = ();
@@ -14,6 +22,10 @@ impl FromStr for OutcomeType {
             "BINARY" => Ok(OutcomeType::BINARY),
             "MULTIPLE_CHOICE" => Ok(OutcomeType::MULTIPLE_CHOICE),
             "POLL" => Ok(OutcomeType::POLL),
+            "BOUNTIED_QUESTION" => Ok(OutcomeType::BOUNTIED_QUESTION),
+            "PSEUDO_NUMERIC" => Ok(OutcomeType::PSEUDO_NUMERIC),
+            "NUMBER" => Ok(OutcomeType::NUMBER),
+            "STONK" => Ok(OutcomeType::STONK),
             _ => Err(()),
         }
     }
@@ -23,18 +35,19 @@ impl FromStr for OutcomeType {
 pub struct ManifoldMarket {
     pub question: String,
     pub id: String,
-    #[serde(with = "ts_milliseconds")]
-    pub createdTime: DateTime<Utc>,
-    #[serde(with = "ts_milliseconds_option")]
-    #[serde(default)]
-    pub closeTime: Option<DateTime<Utc>>,
-    #[serde(with = "ts_milliseconds_option")]
-    #[serde(default)]
-    pub resolutionTime: Option<DateTime<Utc>>,
-    pub totalLiquidity: f64,
-    pub outcomeType: OutcomeType,
+    //    #[serde(with = "ts_milliseconds")]
+    // pub createdTime: Option<u64>,
+    // // #[serde(with = "ts_milliseconds_option")]
+    // // #[serde(default)]
+    // pub closeTime: Option<u64>,
+    // // #[serde(with = "ts_milliseconds_option")]
+    // // #[serde(default)]
+    // pub resolutionTime: Option<u64>,
+    // pub totalLiquidity: Option<f64>,
+    pub outcomeType: Option<OutcomeType>,
     pub pool: Option<BetPool>,
-    pub probability: f64,
+    pub probability: Option<f64>,
+    // pub positions: Option<Vec<Position>>,
 }
 
 #[derive(Deserialize, Debug, Serialize, Clone)]
@@ -51,13 +64,46 @@ pub struct ManifoldEvent {}
 // }
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct BetPool {
-    NO: f64,
-    YES: f64,
+    pub NO: f64,
+    pub YES: f64,
+}
+pub type PostionFrom = HashMap<String, [u64; 5]>;
+pub type PositionShares = HashMap<String, f64>;
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+pub struct ManifoldPosition {
+    pub id: u64,
+    // #[serde(deserialize_with = "deserialize_from")]
+    // pub from : PostionFrom,
+    pub hasShares: bool,
+    pub invested: f64,
+    pub loan: f64,
+    pub maxSharesOutcome: Option<String>,
+    pub payout: f64,
+    pub profit: f64,
+    pub totalShares: PositionShares,
+    pub userId: Option<String>,
+    pub userUsername: Option<String>,
+    pub lastBetTime: u64,
+}
+fn deserialize_from<'de, D>(deserializer: D) -> std::result::Result<Option<[f64; 2]>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    unimplemented!()
 }
 
+// #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+// pub struct PositionFrom {
+//     period: String,
+//     profit: u64,
+//     profitPercent: f64,
+//     invested: u64,
+//     prevValue: u64,
+//     value: u64,
+// }
 impl fmt::Display for ManifoldMarket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.outcomeType == OutcomeType::BINARY {
+        if (self.outcomeType) == Some(OutcomeType::BINARY) {
             let question = self.question.to_string();
             let pool = self.pool.as_ref().unwrap();
             let total_pool = pool.NO + pool.YES;
@@ -92,30 +138,30 @@ impl From<serde_json::Value> for ManifoldMarket {
     fn from(value: serde_json::Value) -> Self {
         let id = value["id"].to_string();
         let question = value["question"].to_string();
-        let createdTime = value["createdTime"]
-            .to_string()
-            .parse::<DateTime<Utc>>()
-            .expect("Failed to parse created time");
-        let closeTime = value["closeTime"]
-            .to_string()
-            .parse::<DateTime<Utc>>()
-            .unwrap();
-        let volume = value["volume"].as_f64().unwrap();
+        // let createdTime = value["createdTime"]
+        //     .to_string()
+        //     .parse::<u64>()
+        //     .expect("Failed to parse created time");
+        // let closeTime = value["closeTime"]
+        //     .to_string()
+        //     .parse::<u64>()
+        //     .unwrap();
+        // let volume = value["volume"].as_f64().unwrap();
         let outcomeType = value["outcomeType"]
             .to_string()
             .parse::<OutcomeType>()
             .unwrap();
         let pool = BetPool::from(value["pool"].clone());
         let probability = value["probability"].as_f64().unwrap();
+        // let positions = value["positions"].as_array().unwrap();
         ManifoldMarket {
             id,
             question,
-            createdTime,
-            resolutionTime: Some(closeTime),
-            closeTime: Some(closeTime),
-            probability,
-            totalLiquidity: volume,
-            outcomeType,
+            // createdTime: Some(createdTime),
+            // resolutionTime: Some(closeTime),
+            // closeTime: Some(closeTime),
+            probability: Some(probability),
+            outcomeType: Some(outcomeType),
             pool: Some(pool),
         }
     }
