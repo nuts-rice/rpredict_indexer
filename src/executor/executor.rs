@@ -1,29 +1,23 @@
 use crate::admin::listener::MarketUpdateRcv;
 use crate::api::{self, *};
-use crate::context::Context;
 use crate::manifold::ManifoldMarket;
 use crate::polymarket::PolymarketEvent;
-use crate::{admin, types::*};
+use crate::types::*;
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
 use async_openai::types::{CreateMessageRequestArgs, CreateRunRequestArgs};
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        AssistantStreamEvent, AssistantTools, CreateAssistantRequestArgs, CreateMessageRequest,
-        CreateRunRequest, CreateThreadRequest, FunctionObject, MessageContent, MessageDeltaContent,
-        MessageRole, RunObject, RunStatus, SubmitToolOutputsRunRequest, ToolsOutputs,
+        AssistantStreamEvent, CreateAssistantRequestArgs, CreateThreadRequest, MessageContent,
+        MessageDeltaContent, MessageRole, RunObject, RunStatus, SubmitToolOutputsRunRequest,
+        ToolsOutputs,
     },
     Client,
 };
 use axum::async_trait;
 use futures_util::StreamExt;
-use qdrant_client::qdrant::{
-    CreateCollectionBuilder, Distance, PointStruct, SearchPointsBuilder, UpsertPointsBuilder,
-    VectorParamsBuilder,
-};
-use qdrant_client::{Payload, Qdrant};
-use serde_json::json;
-use std::any::Any;
+use qdrant_client::qdrant::PointStruct;
+use qdrant_client::Qdrant;
 use std::sync::{Arc, RwLock};
 use tokio::io::AsyncReadExt;
 use tokio_tungstenite::tungstenite::protocol::Message;
@@ -45,37 +39,6 @@ pub enum PromptorType {
     Manifold,
 }
 
-#[derive(Clone)]
-pub struct ExecutorBuilder<E: Executor + Any> {
-    marker: std::marker::PhantomData<E>,
-    max_tokens: u32,
-    token_limit: u32,
-    promptor: Promptor,
-    executor_type: ExecutorType,
-    // platform: api::PlatformBuilder<>
-    // assitant_args: CreateAssistantRequestArgs,
-}
-
-impl<E: Executor + Any> ExecutorBuilder<E> {
-    pub fn new(
-        max_tokens: u32,
-        token_limit: u32,
-        promptor: Promptor,
-        executor_type: ExecutorType,
-    ) -> Self {
-        Self {
-            max_tokens,
-            token_limit,
-            promptor,
-            marker: std::marker::PhantomData,
-            executor_type,
-        }
-    }
-
-    pub fn build(self) -> E {
-        E::from(self)
-    }
-}
 #[derive(Clone)]
 pub struct Promptor {}
 
@@ -232,7 +195,7 @@ Your answer will be used to use the tool so it must be very concise and make sur
     }
 
     async fn superforecaster(&self, question: &str, outcome: &str) -> String {
-        let prompt = format!(" You are a Superforecaster tasked with correctly predicting the likelihood of events.
+        format!(" You are a Superforecaster tasked with correctly predicting the likelihood of events.
         Use the following systematic process to develop an accurate prediction for the following
         question={} and outcome={} combination. 
         
@@ -261,65 +224,64 @@ Your answer will be used to use the tool so it must be very concise and make sur
 
         Give your response in the following format:
 
-        The question {}; has a likelihood (float)% for outcome of (str).", question, outcome, outcome, question).to_string();
-        prompt
+        The question {}; has a likelihood (float)% for outcome of (str).", question, outcome, outcome, question).to_string()
     }
 }
 #[async_trait]
-pub trait Executor: From<ExecutorBuilder<Self>> + Any {
+pub trait Executor<M>: Send + Sync + 'static {
     async fn init(
         &self,
         question: &str,
         outcome: &str,
         tags: Option<Vec<String>>,
-        ctx: &mut Context,
-    ) -> Result<()>;
-    async fn aggregate_data(&self) -> Result<()>;
-    async fn execute(&self, ctx: Context, rx: MarketUpdateRcv);
-    fn builder(
-        max_tokens: u32,
-        token_limit: u32,
-        promptor: Promptor,
-        executor_type: ExecutorType,
-    ) -> ExecutorBuilder<Self> {
-        //TODO : pass down token_limit and max tokens
-        ExecutorBuilder::new(max_tokens, token_limit, Promptor {}, executor_type)
-    }
+    ) -> anyhow::Result<()>;
+    async fn execute(
+        &self,
+        rx: MarketUpdateRcv,
+        markets: Vec<M>,
+        strat_config: StrategyConfig,
+    ) -> anyhow::Result<()>;
+}
+#[derive(Clone)]
+pub struct PolymarketExecutor<S: 'static + Send + Sync> {
+    provider: Arc<api::polymarket::PolymarketPlatform>,
+    promptor: Promptor,
+    marker: std::marker::PhantomData<S>,
+    //ExecutorBuilder<Self>
 }
 
-impl<E: Executor + Any> Default for ExecutorBuilder<E> {
-    fn default() -> Self {
-        Self::new(1000, 1000, Promptor {}, ExecutorType::Polymarket)
-    }
-}
-
-pub struct PolymarketExecutor(ExecutorBuilder<Self>);
-
-impl From<ExecutorBuilder<Self>> for PolymarketExecutor {
-    fn from(value: ExecutorBuilder<Self>) -> Self {
-        Self(value)
+// impl From<ExecutorBuilder<Self>> for PolymarketExecutor {
+//     fn from(value: ExecutorBuilder<Self>) -> Self {
+//         Self(value)
+//     }
+// }
+impl<S: 'static + Sync + Send> PolymarketExecutor<S> {
+    pub fn new(provider: Arc<api::polymarket::PolymarketPlatform>, promptor: Promptor) -> Self {
+        Self {
+            provider,
+            promptor,
+            marker: std::marker::PhantomData,
+        }
     }
 }
 
 #[async_trait]
-impl Executor for PolymarketExecutor {
+impl<S: 'static + Sync + Send> Executor<S> for PolymarketExecutor<S> {
     async fn init(
         &self,
         question: &str,
         outcome: &str,
         tags: Option<Vec<String>>,
-        ctx: &mut Context,
         //<'a>,
-    ) -> Result<()> {
-        let builder = &self.0;
+    ) -> anyhow::Result<()> {
         let platform = api::polymarket::PolymarketPlatform::from(PlatformBuilder::default());
-        let news = lookup_news(question, outcome).await?;
+        let news = lookup_news(question, outcome).await.unwrap();
         //todo: Pare down news to only the relevant information
         let trimmed_news = news.iter().take(8).collect::<Vec<&String>>();
         // tracing::debug!("News: {:?}", news);
         tracing::debug!("Trimmed News: {:?}", trimmed_news);
         let mut trimmed_markets: Vec<serde_json::Value> = Vec::new();
-        let initial_events = platform.fetch_events(Some(100), 20).await?;
+        let initial_events = platform.fetch_events(Some(100), 20).await.unwrap();
         initial_events.iter().for_each(|event| {
             tracing::debug!("Initial event: {:?}", event);
             let market_summarized = parse_polymarket_event(event.clone()).unwrap();
@@ -332,7 +294,7 @@ impl Executor for PolymarketExecutor {
         // tracing::debug!("Trimmed Market Data: {:?}", trimmed_market_data);
         let query = [("limit", "1")];
         let client = async_openai::Client::new();
-        let prompt = builder.promptor.prompts_polymarket_filter(
+        let prompt = self.promptor.prompts_polymarket_filter(
             trimmed_market_data,
             trimmed_news,
             question,
@@ -341,8 +303,7 @@ impl Executor for PolymarketExecutor {
 
         let assistant_request = CreateAssistantRequestArgs::default()
             .instructions(
-                builder
-                    .promptor
+                self.promptor
                     .superforecaster(question, outcome)
                     .await
                     .to_string(),
@@ -350,27 +311,6 @@ impl Executor for PolymarketExecutor {
             .model("gpt-4o")
             .build()?;
         let assistant = client.assistants().create(assistant_request).await?;
-        // let tools = assistant.tools.clone();
-        // let tools_as_string = tools.iter().map(|t| {
-        //     serde_json::to_string(&match t {
-        //         AssistantTools::FileSearch(_) => json!({"name": "retrieval", "description": "useful to retrieve information from files"}),
-        //            AssistantTools::Function(e) => {
-        //                 let data = e.data.as_ref().unwrap();
-        //                 json!({
-        //                     "name": "action",
-        //                     "description": "Useful to make HTTP requests to the user's APIs, which would provide you later some additional context about the user's problem. You can also use this to perform actions to help the user.",
-        //                     "data": {
-        //                         "info": {
-        //                             "description": data.get("info").unwrap_or(&json!({})).get("description").unwrap_or(&json!("")).to_string().replace("\"", ""),
-        //                             "title": data.get("info").unwrap_or(&json!({})).get("title").unwrap_or(&json!("")).to_string().replace("\"", ""),
-        //                         },
-        //                         "paths": data.get("paths"),
-        //                     }
-        //                 })
-        //         },
-        //     }).unwrap()
-
-        // }).collect::<Vec<String>>();
         let assistant_id = assistant.id.clone();
         let thread = client
             .threads()
@@ -453,63 +393,85 @@ impl Executor for PolymarketExecutor {
         client.assistants().delete(&assistant.id).await?;
         Ok(())
     }
-    async fn aggregate_data(&self) -> Result<()> {
-        Ok(())
-    }
-    async fn execute(&self, ctx: Context, rx: MarketUpdateRcv) {
-        println!("Polymarket Executor executing");
+    async fn execute(
+        &self,
+        rx: MarketUpdateRcv,
+        markets: Vec<S>,
+        strat_config: StrategyConfig,
+    ) -> anyhow::Result<()> {
+        tracing::info!("Polymarket Executor executing");
+        // let mut market_request = crate::admin::listener::MarketRequestRcv;
+        // for market in markets {
+        //     market_request
+        // }
+
+        unimplemented!()
     }
 }
 
-pub struct ManifoldExecutor(ExecutorBuilder<Self>);
+#[derive(Clone)]
+pub struct ManifoldExecutor<S> {
+    provider: Arc<api::manifold::ManifoldPlatform>,
+    promptor: Promptor,
+    marker: std::marker::PhantomData<S>,
+    //ExecutorBuilder<Self>
+}
 
-impl From<ExecutorBuilder<Self>> for ManifoldExecutor {
-    fn from(value: ExecutorBuilder<Self>) -> Self {
-        Self(value)
+impl<S: Send + Sync + Clone> ManifoldExecutor<S> {
+    pub fn new(provider: Arc<api::manifold::ManifoldPlatform>, promptor: Promptor) -> Self {
+        Self {
+            provider,
+            promptor,
+            marker: std::marker::PhantomData,
+        }
     }
 }
+
+// impl From<ExecutorBuilder<Self>> for ManifoldExecutor {
+//     fn from(value: ExecutorBuilder<Self>) -> Self {
+//         Self(value)
+//     }
+// }
 
 #[async_trait]
-impl Executor for ManifoldExecutor {
+impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
     async fn init(
         &self,
         question: &str,
         outcome: &str,
         tags: Option<Vec<String>>,
-        ctx: &mut Context,
-    ) -> Result<()> {
-        let builder = &self.0;
+    ) -> anyhow::Result<()> {
         let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
         let qdrant = Arc::new(RwLock::new(
             Qdrant::from_url("http://localhost:6334").build().unwrap(),
         ));
-        let news = lookup_news(question, outcome).await?;
+        let news = lookup_news(question, outcome).await.unwrap();
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("Trimmed News: {:?}", trimmed_news);
         // tracing::debug!("News: {:?}", news);
-        let mut point_id = 1;
-        let mut points: Vec<PointStruct> = Vec::new();
+        let point_id = 1;
+        let points: Vec<PointStruct> = Vec::new();
         let collection_name = "Manifold_collection";
         // let (tx, rx)  = tokio::sync::mpsc::channel(100);
         qdrant.read().unwrap().delete_collection(collection_name);
-        ctx.strategy_config
-            .write()
-            .unwrap()
-            .qdrant
-            .create_collection(
-                CreateCollectionBuilder::new(collection_name.to_string())
-                    .vectors_config(VectorParamsBuilder::new(512, Distance::Cosine)),
-            );
+        // ctx.strategy_config
+        //     .write()
+        //     .unwrap()
+        //     .qdrant
+        //     .create_collection(
+        //         CreateCollectionBuilder::new(collection_name.to_string())
+        //             .vectors_config(VectorParamsBuilder::new(512, Distance::Cosine)),
+        //     );
         let mut markets: Vec<serde_json::Value> = Vec::new();
-        ctx.strategy_config.write().unwrap().collection_name = collection_name.to_string();
+        // ctx.strategy_config.write().unwrap().collection_name = collection_name.to_string();
         if let Some(tags) = tags {
             for tag in tags {
-                let market_data = platform.fetch_markets_by_terms(&tag).await?;
+                let market_data = platform.fetch_markets_by_terms(&tag).await.unwrap();
                 let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
                 market_data.iter().for_each(|m| {
                     let market_summarized = parse_manifold_market(m.clone()).unwrap();
-
-                    markets.push(market_summarized.into());
+                    // ctx.questions.push(market_summarized.clone().to_string());
+                    markets.push(market_summarized);
                 })
             }
         }
@@ -545,7 +507,7 @@ impl Executor for ManifoldExecutor {
         // let trimmed_market_data = questions.iter().zip(probabilities.iter()).take(5).collect::<Vec<(&serde_json::Value, &serde_json::Value)>>();
         let trimmed_markets = markets.iter().take(5).collect::<Vec<&serde_json::Value>>();
         tracing::debug!("Trimmed Market Data: {:?}", trimmed_markets);
-
+        // tracing::debug!("ctx questions: {:?}", ctx.questions);
         // let trimmed_market_data = market_data.iter().take(5).collect::<Vec<&String>>();
 
         // let trimmed_actual_markets: Vec<String> = trimmed_market_data.iter().map(|q| {
@@ -555,17 +517,13 @@ impl Executor for ManifoldExecutor {
         // tracing::debug!("Market Data: {:?}", market_data);
         let query = [("limit", "1")];
         let client = async_openai::Client::new();
-        let prompt = builder.promptor.prompts_manifold_filter(
-            trimmed_markets,
-            trimmed_news,
-            question,
-            outcome,
-        );
+        let prompt =
+            self.promptor
+                .prompts_manifold_filter(trimmed_markets, trimmed_news, question, outcome);
 
         let assistant_request = CreateAssistantRequestArgs::default()
             .instructions(
-                builder
-                    .promptor
+                self.promptor
                     .superforecaster(question, outcome)
                     .await
                     .to_string(),
@@ -656,41 +614,56 @@ impl Executor for ManifoldExecutor {
         Ok(())
     }
 
-    async fn aggregate_data(&self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn execute(&self, ctx: Context, rx: MarketUpdateRcv) {
-        let platform = ctx.manifold.read().unwrap();
-        let strat_config = ctx.strategy_config.read().unwrap();
-        let questions = ctx.questions;
-        loop {
-
-            // tokio::task::spawn(async move {
-            //     admin::listener::listen_for_requests(questions, cache, market_update_rx, ctx)
-            // })
-        }
-        println!("Manifold Executor executing");
+    async fn execute(
+        &self,
+        rx: MarketUpdateRcv,
+        questions: Vec<S>,
+        strat_config: StrategyConfig,
+    ) -> anyhow::Result<()> {
+        // let platform = ctx.manifold.read().unwrap();
+        // let strat_config = ctx.strategy_config.read().unwrap();
+        // let questions = ctx.questions;
+        // loop {
+        //     // for
+        //     // tokio::task::spawn(async move {
+        //     //     admin::listener::listen_for_requests(questions, cache, market_update_rx, ctx)
+        //     // })
+        // }
+        unimplemented!()
     }
 }
-pub struct MetaculusExecutor(ExecutorBuilder<Self>);
 
-impl From<ExecutorBuilder<Self>> for MetaculusExecutor {
-    fn from(value: ExecutorBuilder<Self>) -> Self {
-        Self(value)
+#[derive(Clone)]
+pub struct MetaculusExecutor<S> {
+    provider: Arc<api::metaculus::MetaculusPlatform>,
+    promptor: Promptor,
+    marker: std::marker::PhantomData<S>,
+}
+
+// impl From<ExecutorBuilder<Self>> for MetaculusExecutor {
+//     fn from(value: ExecutorBuilder<Self>) -> Self {
+//         Self(value)
+//     }
+// }
+
+impl<S: Send + Sync + Clone> MetaculusExecutor<S> {
+    pub fn new(provider: Arc<api::metaculus::MetaculusPlatform>, promptor: Promptor) -> Self {
+        Self {
+            provider,
+            promptor,
+            marker: std::marker::PhantomData,
+        }
     }
 }
 
 #[async_trait]
-impl Executor for MetaculusExecutor {
+impl<S: Send + Sync + Clone + 'static> Executor<S> for MetaculusExecutor<S> {
     async fn init(
         &self,
         question: &str,
         outcome: &str,
         tags: Option<Vec<String>>,
-        ctx: &mut Context,
-    ) -> Result<()> {
-        let builder = &self.0;
+    ) -> anyhow::Result<()> {
         let platform = api::metaculus::MetaculusPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await.unwrap();
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
@@ -743,7 +716,7 @@ impl Executor for MetaculusExecutor {
         // tracing::debug!("Market Data: {:?}", market_data);
         let query = [("limit", "1")];
         let client = async_openai::Client::new();
-        let prompt = builder.promptor.prompts_metaculus_filter(
+        let prompt = self.promptor.prompts_metaculus_filter(
             trimmed_market_data.clone(),
             trimmed_news,
             question,
@@ -752,8 +725,7 @@ impl Executor for MetaculusExecutor {
 
         let assistant_request = CreateAssistantRequestArgs::default()
             .instructions(
-                builder
-                    .promptor
+                self.promptor
                     .superforecaster(question, outcome)
                     .await
                     .to_string(),
@@ -844,15 +816,14 @@ impl Executor for MetaculusExecutor {
         Ok(())
     }
 
-    async fn aggregate_data(&self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn execute(&self, ctx: Context, rx: MarketUpdateRcv) {
-        let builder = &self.0;
-        let (platform) = ctx.manifold.read().unwrap();
-        let questions = ctx.questions;
+    async fn execute(
+        &self,
+        rx: MarketUpdateRcv,
+        questions: Vec<S>,
+        strat_config: StrategyConfig,
+    ) -> anyhow::Result<()> {
         println!("Metaculus Executor executing");
+        unimplemented!()
     }
 }
 
@@ -928,10 +899,7 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
         "".to_string()
     };
     let pool: [String; 2] = if let Some(pool) = market.pool {
-        [
-            format!("Yes: {}", pool.YES.to_string()),
-            format!("No: {}", pool.NO.to_string()),
-        ]
+        [format!("Yes: {}", pool.YES), format!("No: {}", pool.NO)]
     } else {
         ["0".to_string(), "0".to_string()]
     };
@@ -1034,7 +1002,7 @@ async fn lookup_news(question: &str, outcome: &str) -> Result<Vec<String>> {
         .results
         .iter()
         .map(|r| {
-            if (r.score.clone() > 0.5) {
+            if r.score > 0.5 {
                 r.content.clone()
             } else {
                 "".to_string()
@@ -1054,12 +1022,11 @@ fn filter_news() -> Result<Vec<serde_json::Value>> {
 }
 
 mod tests {
-    use super::*;
-    use tracing_subscriber::prelude::*;
+    
+    
+
     #[tokio::test]
     async fn test_polymarket_executor() {
-        let executor =
-            PolymarketExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Polymarket).build();
         // let result = executor
         //     .init(
         //         "What is the probability of Joe Biden winning the 2024 US elections?",
@@ -1088,156 +1055,189 @@ mod tests {
         .await;
         tracing::debug!("News: {:?}", news);
     }
-    #[tokio::test]
-    async fn test_orderbook_pipeline() {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        let tags: Vec<String> = vec!["US-economics".to_string(), "Treasury".to_string()];
-        let mut context = Context::new();
-        let executor =
-            ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
-        let result = executor
-            .init(
-                "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?",
-                "10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher",
-                Some(tags),
-                &mut context,
-            )
-            .await
-            .unwrap();
-        tracing::debug!("Result: {:?}", result);
-    }
+    // #[tokio::test]
+    // async fn test_orderbook_pipeline() {
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::EnvFilter::try_from_default_env()
+    //                 .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //         )
+    //         .with(tracing_subscriber::fmt::layer())
+    //         .init();
+    //     let tags: Vec<String> = vec!["US-economics".to_string(), "Treasury".to_string()];
+    //     let question_vec: Vec<String> = vec![
+    //         "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?".to_string(),
+    //     ];
 
-    #[tokio::test]
-    async fn test_data_pipeline() {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        let tags: Vec<String> = vec!["GPT-5".to_string(), "AI".to_string(), "OpenAI".to_string()];
-        let mut context = Context::new();
-        let executor =
-            ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
-        let result = executor
-            .init(
-                "What is the probability of GPT-5 being availiable by 2025",
-                "GPT-5 being availiable by 2025",
-                Some(tags),
-                &mut context,
-            )
-            .await
-            .unwrap();
-        tracing::debug!("Result: {:?}", result);
-    }
-    #[tokio::test]
-    async fn test_stalker_pipeline() {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        let tags: Vec<String> = vec![
-            "Stalker 2".to_string(),
-            "Stalker".to_string(),
-            "GSC Game World".to_string(),
-        ];
+    //     let executor = Box::new(ManifoldExecutor::new(
+    //         Arc::new(api::manifold::ManifoldPlatform::from(
+    //             PlatformBuilder::default(),
+    //         )),
+    //         Promptor {},
+    //     ));
+    //     let result = executor
+    //         .init(
+    //             "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?",
+    //             "10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher",
+    //             Some(tags),
+    //         )
+    //         .await
+    //         .unwrap();
+    //     tracing::debug!("Result: {:?}", result);
+    // }
 
-        let executor =
-            ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
-        let mut context = Context::new();
-        let result = executor
-            .init(
-                "What is the probability of Stalker 2 being released by 2025",
-                "Stalker 2 being released by 2025",
-                Some(tags),
-                &mut context,
-            )
-            .await
-            .unwrap();
-        tracing::debug!("Result: {:?}", result);
-    }
-    #[tokio::test]
-    async fn test_polymarket_pipeline() {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        let tags: Vec<String> = vec!["o1".to_string(), "AI".to_string(), "OpenAI".to_string()];
+    // #[tokio::test]
+    // async fn test_data_pipeline() {
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::EnvFilter::try_from_default_env()
+    //                 .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //         )
+    //         .with(tracing_subscriber::fmt::layer())
+    //         .init();
+    //     let tags: Vec<String> = vec!["GPT-5".to_string(), "AI".to_string(), "OpenAI".to_string()];
+    //     let question_vec: Vec<String> =
+    //         vec!["What is the probability of GPT-5 being availiable by 2025".to_string()];
+    //     let context = Context::new();
+    //     let executor: ManifoldExecutor<_> = ManifoldExecutor::new(
+    //         Arc::new(api::manifold::ManifoldPlatform::from(
+    //             PlatformBuilder::default(),
+    //         )),
+    //         Promptor {},
+    //     );
 
-        let executor =
-            PolymarketExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Polymarket).build();
-        let mut context = Context::new();
-        let result = executor
-            .init(
-"Will OpenAI's o1 remain the top LLM in all categories of Chatbot Arena on December 30, 2024?",
-"o1 has same or higher rank than all non-o1 models in all categories of Chatbot Arena on December 30, 2024",
-                Some(tags),
-                &mut context)
-            .await
-            .unwrap();
-        tracing::debug!("Result: {:?}", result);
-    }
-    #[tokio::test]
-    async fn test_nvidia_pipeline() {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        let tags: Vec<String> = vec!["economy-business".to_string()];
+    //     let result = executor
+    //         .init(
+    //             "What is the probability of GPT-5 being availiable by 2025",
+    //             "GPT-5 being availiable by 2025",
+    //             Some(tags),
+    //         )
+    //         .await
+    //         .unwrap();
+    //     tracing::debug!("Result: {:?}", result);
+    // }
+    // #[tokio::test]
+    // async fn test_stalker_pipeline() {
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::EnvFilter::try_from_default_env()
+    //                 .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //         )
+    //         .with(tracing_subscriber::fmt::layer())
+    //         .init();
+    //     let tags: Vec<String> = vec![
+    //         "Stalker 2".to_string(),
+    //         "Stalker".to_string(),
+    //         "GSC Game World".to_string(),
+    //     ];
+    //     let question_vec: Vec<String> =
+    //         vec!["What is the probability of GPT-5 being availiable by 2025".to_string()];
+    //     let executor = ManifoldExecutor::new(
+    //         Arc::new(api::manifold::ManifoldPlatform::from(
+    //             PlatformBuilder::default(),
+    //         )),
+    //         Promptor {},
+    //     );
 
-        let executor =
-            MetaculusExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Metaculus).build();
-        let mut context = Context::new();
-        let result = executor
-            .init(
-                "On October 31, 2024, will Nvidia's market capitalization be larger than Apple's?",
-                "Nvidia's market capitalization is larger than Apple's on October 31, 2024",
-                Some(tags),
-                &mut context,
-            )
-            .await
-            .unwrap();
-        tracing::debug!("Result: {:?}", result);
-    }
-    #[tokio::test]
-    async fn test_metaculus_pipeline() {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        let tags: Vec<String> = vec!["artificial-intelligence".to_string()];
+    //     let result = executor
+    //         .init(
+    //             "What is the probability of Stalker 2 being released by 2025",
+    //             "Stalker 2 being released by 2025",
+    //             Some(tags),
+    //         )
+    //         .await
+    //         .unwrap();
+    //     tracing::debug!("Result: {:?}", result);
+    // }
+    // #[tokio::test]
+    // async fn test_polymarket_pipeline() {
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::EnvFilter::try_from_default_env()
+    //                 .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //         )
+    //         .with(tracing_subscriber::fmt::layer())
+    //         .init();
+    //     let tags: Vec<String> = vec!["o1".to_string(), "AI".to_string(), "OpenAI".to_string()];
+    //     let question_vec: Vec<String> = vec![
+    //         "Will OpenAI's o1 remain the top LLM in all categories of Chatbot Arena on December 30, 2024?"
+    //         .to_string(),];
+    //     let executor = PolymarketExecutor::new(
+    //         Arc::new(api::polymarket::PolymarketPlatform::from(
+    //             PlatformBuilder::default(),
+    //         )),
+    //         Promptor {},
+    //     );
 
-        let executor =
-            MetaculusExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Metaculus).build();
-        let mut context = Context::new();
-        let result = executor
-            .init(
-"Will OpenAI's o1 remain the top LLM in all categories of Chatbot Arena on December 30, 2024?",
-"o1 has same or higher rank than all non-o1 models in all categories of Chatbot Arena on December 30, 2024",
-                Some(tags),
-                &mut context
-            )
-            .await
-            .unwrap();
-        tracing::debug!("Result: {:?}", result);
-    }
+    //     let result = executor
+    //         .init(
+    // "Will OpenAI's o1 remain the top LLM in all categories of Chatbot Arena on December 30, 2024?",
+    // "o1 has same or higher rank than all non-o1 models in all categories of Chatbot Arena on December 30, 2024",
+    //             Some(tags),
+    //             )
+    //         .await
+    //         .unwrap();
+    //     tracing::debug!("Result: {:?}", result);
+    // }
+    // #[tokio::test]
+    // async fn test_nvidia_pipeline() {
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::EnvFilter::try_from_default_env()
+    //                 .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //         )
+    //         .with(tracing_subscriber::fmt::layer())
+    //         .init();
+    //     let tags: Vec<String> = vec!["economy-business".to_string()];
+    //     let question_vec = vec![
+    //         "On October 31, 2024, will Nvidia's market capitalization be larger than Apple's?"
+    //             .to_string(),
+    //     ];
+    //     let executor = MetaculusExecutor::new(
+    //         Arc::new(api::metaculus::MetaculusPlatform::from(
+    //             PlatformBuilder::default(),
+    //         )),
+    //         Promptor {},
+    //     );
+
+    //     let result = executor
+    //         .init(
+    //             "On October 31, 2024, will Nvidia's market capitalization be larger than Apple's?",
+    //             "Nvidia's market capitalization is larger than Apple's on October 31, 2024",
+    //             Some(tags),
+    //         )
+    //         .await
+    //         .unwrap();
+    //     tracing::debug!("Result: {:?}", result);
+    // }
+    // #[tokio::test]
+    // async fn test_metaculus_pipeline() {
+    //     tracing_subscriber::registry()
+    //         .with(
+    //             tracing_subscriber::EnvFilter::try_from_default_env()
+    //                 .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //         )
+    // .with(tracing_subscriber::fmt::layer())
+    // .init();
+    // let tags: Vec<String> = vec!["artificial-intelligence".to_string()];
+    // let question_vec: Vec<String> = vec![
+    // "Will OpenAI's o1 remain the top LLM in all categories of Chatbot Arena on December 30, 2024?"
+    // .to_string(),];
+    // let executor = MetaculusExecutor::new(
+    // Arc::new(api::metaculus::MetaculusPlatform::from(
+    //     PlatformBuilder::default(),
+    // )),
+    // Promptor {},
+    // );
+
+    // let result = executor
+    // .init(
+    // "Will OpenAI's o1 remain the top LLM in all categories of Chatbot Arena on December 30, 2024?",
+    // "o1 has same or higher rank than all non-o1 models in all categories of Chatbot Arena on December 30, 2024",
+    //     Some(tags),
+    // )
+    // .await
+    // .unwrap();
+    // tracing::debug!("Result: {:?}", result);
+    // }
 }

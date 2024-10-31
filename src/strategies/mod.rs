@@ -1,14 +1,9 @@
-use crate::context::Context;
-use crate::{
-    api::{Platform, PlatformBuilder},
-    types::StrategyConfig,
-};
+use crate::api::{Platform, PlatformBuilder};
 use axum::async_trait;
 use std::any::Any;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 pub mod arb;
 pub struct StrategyBuilder {
-    pub ctx: Context,
     // api: PlatformBuilder<T>,
     // marker: std::marker::PhantomData<T>,
 }
@@ -33,14 +28,13 @@ impl Default for StrategyBuilder {
 
 impl StrategyBuilder {
     pub fn new() -> Self {
-        let context = Context::new();
-        Self { ctx: context }
+        Self {}
     }
-    pub fn strat_config(mut self, config: StrategyConfig) -> Result<()> {
-        let mut strat_config = self.ctx.strategy_config.write().unwrap();
-        *strat_config = config;
-        Ok(())
-    }
+    // pub fn strat_config(mut self, config: StrategyConfig) -> Result<()> {
+    //     let mut strat_config = self.ctx.strategy_config.write().unwrap();
+    //     *strat_config = config;
+    //     Ok(())
+    // }
     // pub fn api<P>(mut self, api: PlatformBuilder<P>) -> Self {
     //     self.api = api;
     //     self

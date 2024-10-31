@@ -54,6 +54,9 @@ impl Platform for GammaPlatform {
 
         Ok(markets)
     }
+    async fn incoming_market_to_value(&self, market: Self::Market) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
 
     async fn fetch_question_by_id(&self, token_id: &str) -> Result<Self::Market> {
         let mut args = HashMap::new();
@@ -96,6 +99,13 @@ impl Platform for GammaPlatform {
         nonce: &str,
         outcome: &str,
     ) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn incoming_position_to_value(
+        &self,
+        market: Self::Position,
+    ) -> Result<serde_json::Value> {
         unimplemented!()
     }
 

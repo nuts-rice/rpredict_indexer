@@ -129,6 +129,15 @@ impl Platform for PolymarketPlatform {
     ) -> PlatformBuilder<Self> {
         unimplemented!()
     }
+    async fn incoming_market_to_value(&self, market: Self::Market) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
+    async fn incoming_position_to_value(
+        &self,
+        position: Self::Position,
+    ) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
 
     async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>> {
         let builder = &self.0;
@@ -189,7 +198,6 @@ impl Platform for PolymarketPlatform {
 }
 
 mod tests {
-    use super::*;
 
     #[tokio::test]
     async fn test_polymarket_markets() {

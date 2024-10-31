@@ -1,8 +1,4 @@
-use crate::context::Context;
-use crate::types::{MarketStandarized, Tick};
-use chrono::{DateTime, Utc};
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use crate::types::Tick;
 pub type MarketUpdateRecv = tokio::sync::mpsc::Receiver<MarketUpdateResult>;
 pub type MarketUpdateSend = tokio::sync::mpsc::Sender<MarketUpdateResult>;
 #[derive(Debug, Default)]
@@ -11,7 +7,6 @@ pub struct MarketUpdateResult {
     pub tick: Tick,
 }
 pub async fn aggregate_data(
-    ctx: Arc<RwLock<Context>>,
     tx: tokio::sync::watch::Sender<u64>,
     market_tx: MarketUpdateSend,
     chunk_size: usize,
@@ -67,26 +62,26 @@ pub async fn aggregate_data(
 
 // }
 
-pub async fn update_market(
-    market: MarketStandarized,
-    tick: Tick,
-    outcome: &str,
-    market_tx: &MarketUpdateSend,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match outcome {
-        "YES" => {
-            market.pool.unwrap().YES.push(tick.clone());
-        }
-        "NO" => {
-            market.pool.unwrap().NO.push(tick.clone());
-        }
-        _ => {}
-    }
-    let _ = market_tx
-        .send(MarketUpdateResult {
-            market_idx: market.idx,
-            tick,
-        })
-        .await;
-    Ok(())
-}
+// pub async fn update_market(
+//     market: MarketStandarized,
+//     tick: Tick,
+//     outcome: &str,
+//     market_tx: &MarketUpdateSend,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     match outcome {
+//         "YES" => {
+//             market.pool.unwrap().YES.push(tick.clone());
+//         }
+//         "NO" => {
+//             market.pool.unwrap().NO.push(tick.clone());
+//         }
+//         _ => {}
+//     }
+//     let _ = market_tx
+//         .send(MarketUpdateResult {
+//             market_idx: market.idx,
+//             tick,
+//         })
+//         .await;
+//     Ok(())
+// }

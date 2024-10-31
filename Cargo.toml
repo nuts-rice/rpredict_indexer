@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 ansi_term = { version = "0.12.1", features = ["derive_serde_style", "serde"] }
+anyhow = "1.0.91"
 async-graphql = "7.0.9"
 async-graphql-axum = "7.0.9"
 async-openai = { version = "0.25.0", features = ["realtime"] }
@@ -37,6 +38,7 @@ tavily = "1.0.0"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["full"] }
 tokio-tungstenite = "0.24.0"
+toml = "0.8.19"
 tower = "0.5.1"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

@@ -1,34 +1,26 @@
 use crate::context::Context;
-use crate::executor::executor::{
-    Executor, ExecutorType, ManifoldExecutor, PolymarketExecutor, Promptor,
-};
-use crate::types::create_match;
+use crate::executor::executor::Executor;
+use crate::types::{create_match, Market, Settings};
+use anyhow::Result;
 use api::Platform;
 use async_graphql::*;
-use async_graphql_axum::{GraphQL, GraphQLSubscription};
 use axum::{
     extract::Query,
     response::{Html, IntoResponse},
-    routing::get,
-    Router,
 };
+use crossterm::style::Stylize;
+use db::{manifold::ManifoldMarket, metaculus::MetaculusMarket, polymarket::PolymarketResult};
+use ratatui::widgets::{Block, List, ListItem};
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    crossterm::{
-        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-        execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    },
-    style::Stylize,
-    widgets::Paragraph,
-    DefaultTerminal, Terminal,
+    backend::Backend,
+    crossterm::event::{self, KeyCode, KeyEventKind},
+    style::{Modifier, Style},
+    DefaultTerminal,
 };
+use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::RwLock;
-
-use db::{manifold::ManifoldMarket, metaculus::MetaculusMarket, polymarket::PolymarketResult};
-use serde::Deserialize;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod admin;
 pub mod api;
@@ -203,7 +195,7 @@ async fn render_metaculus_markets(
 
 // fn run_markets<B:
 
-fn run_markets(ctx: Context) -> std::io::Result<()> {
+fn run_markets<M>(ctx: Context<M>) -> std::io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear();
     let app_result = run(terminal, ctx);
@@ -215,13 +207,19 @@ fn render_market_select(markets: Vec<String>) -> std::io::Result<()> {
     unimplemented!()
 }
 
-fn run(mut terminal: DefaultTerminal, ctx: Context) -> std::io::Result<()> {
+fn run<M>(mut terminal: DefaultTerminal, ctx: Context<M>) -> std::io::Result<()> {
+    let markets: Vec<ListItem> = ctx
+        .questions
+        .iter()
+        .map(|q| ListItem::from(q.to_string()))
+        .collect();
+    let markets = List::new(markets)
+        .block(Block::bordered().title("Markets"))
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+        .highlight_symbol("> ");
     loop {
         terminal.draw(|frame| {
-            let greeting = Paragraph::new("Hello Ratatui! (press 'q' to quit)")
-                .white()
-                .on_blue();
-            frame.render_widget(greeting, frame.area());
+            frame.render_widget(markets.clone(), frame.area());
         })?;
 
         if let event::Event::Key(key) = event::read()? {
@@ -233,7 +231,7 @@ fn run(mut terminal: DefaultTerminal, ctx: Context) -> std::io::Result<()> {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -251,26 +249,28 @@ async fn main() {
     .finish();
 
     tracing::debug!("connecting to graphql");
-    let tags: Vec<String> = vec!["GPT-5".to_string(), "AI".to_string(), "OpenAI".to_string()];
-    let mut context = Context::new();
-    let executor =
-        ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
-    let result = executor
-        .init(
-            "What is the probability of GPT-5 being availiable by 2025",
-            "GPT-5 being availiable by 2025",
-            Some(tags),
-            &mut context,
-        )
-        .await
-        .unwrap();
+    // let executor =
+    // ManifoldExecutor::new(Arc::new(api::manifold::ManifoldPlatform::from(PlatformBuilder::default())), Promptor{});
 
-    let mut dummy_questions = vec![
-        "What is the probability of GPT-5 being availiable by 2025".to_string(),
-        "What is the probability of Stalker 2 being released by 2025".to_string(),
-        "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?".to_string(),
-    ];
+    let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
 
+    let period = {
+        let config_guard = config.read().unwrap();
+        config_guard.period
+    };
+    let questions_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().markets.clone()));
+    tracing::debug!(
+        "questions_list: {:#?}",
+        questions_list_rwlock.read().unwrap()
+    );
+    let questions_clone = questions_list_rwlock.read().unwrap();
+    let mut context: Context<Market> = Context::default();
+    questions_list_rwlock
+        .read()
+        .unwrap()
+        .iter()
+        .for_each(|q| context.add_question(q.to_string()));
+    // tracing::debug!("context questions: {:#?}", &context.questions);
     // context.questions.
 
     // let app = Router::new()
@@ -293,4 +293,6 @@ async fn main() {
     // tracing::debug!("questions: {:#?}", questions[0]);
     // axum::serve(listener, app).await.unwrap();
     run_markets(context);
+
+    Ok(())
 }

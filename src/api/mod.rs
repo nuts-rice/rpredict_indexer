@@ -70,6 +70,12 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>>;
     async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>>;
     async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>>;
+    async fn incoming_position_to_value(
+        &self,
+        position: Self::Position,
+    ) -> Result<serde_json::Value>;
+    async fn incoming_market_to_value(&self, market: Self::Market) -> Result<serde_json::Value>;
+
     type Market;
     type Event;
     type Position;

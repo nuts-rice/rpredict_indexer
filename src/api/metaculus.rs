@@ -4,7 +4,6 @@ use super::{Platform, PlatformBuilder};
 use crate::model::metaculus::{
     MetaculusEvent, MetaculusMarket, MetaculusPosition, MetaculusResponse,
 };
-use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
 pub struct MetaculusPlatform(PlatformBuilder<Self>);
@@ -80,6 +79,15 @@ impl Platform for MetaculusPlatform {
         // questions.extend(response.results.into_iter());
         // tracing::debug!("questions: {:?}", questions);
         // Ok(questions)
+    }
+    async fn incoming_position_to_value(
+        &self,
+        position: Self::Position,
+    ) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
+    async fn incoming_market_to_value(&self, position: Self::Market) -> Result<serde_json::Value> {
+        unimplemented!()
     }
 
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 pub struct ManifoldPlatform(PlatformBuilder<Self>);
 
 //TODO: use this to grab tags
-const GROUP_URL: &'static str = "https://api.manifold.markets/v0/groups";
+const GROUP_URL: &str = "https://api.manifold.markets/v0/groups";
 impl From<PlatformBuilder<Self>> for ManifoldPlatform {
     fn from(value: PlatformBuilder<Self>) -> Self {
         Self(value)
@@ -53,6 +53,31 @@ impl Platform for ManifoldPlatform {
 
         Ok(markets)
     }
+    async fn incoming_market_to_value(&self, market: Self::Market) -> Result<serde_json::Value> {
+        let probability: String = if let Some(probability) = market.probability {
+            probability.to_string()
+        } else {
+            "".to_string()
+        };
+        let pool: [String; 2] = if let Some(pool) = market.pool {
+            [format!("Yes: {}", pool.YES), format!("No: {}", pool.NO)]
+        } else {
+            ["0".to_string(), "0".to_string()]
+        };
+        let market_summarized = serde_json::json!({
+            "question": market.question,
+            "probability": probability,
+            "pool": pool,
+        });
+        Ok(market_summarized)
+    }
+
+    async fn incoming_position_to_value(
+        &self,
+        position: Self::Position,
+    ) -> Result<serde_json::Value> {
+        unimplemented!()
+    }
 
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {
         unimplemented!()
@@ -78,7 +103,7 @@ impl Platform for ManifoldPlatform {
         outcome: &str,
     ) -> Result<()> {
         let builder = &self.0;
-        let url = format!("https://api.manifold.markets/v0/bet",);
+        let url = "https://api.manifold.markets/v0/bet".to_string();
         let key: String = std::env::var("MANIFOLD_API_KEY").unwrap();
         let prepped_order = serde_json::json!(
             {
@@ -146,8 +171,7 @@ impl Platform for ManifoldPlatform {
 }
 
 mod tests {
-    use super::*;
-    use tracing_subscriber::prelude::*;
+
     #[tokio::test]
     async fn test_manifold_markets() {
         // tracing_subscriber::registry()

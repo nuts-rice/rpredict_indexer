@@ -1,16 +1,8 @@
-use crate::{
-    api::{self, *},
-    manifold::ManifoldMarket,
-    types::StrategyConfig,
-};
-use chrono::{DateTime, Utc};
-use qdrant_client::{config::QdrantConfig, Qdrant};
+use crate::{executor::executor::Executor, types::StrategyConfig};
 use ratatui::widgets::ListState;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::sync::{Arc, RwLock};
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::task::JoinSet;
 
 pub struct StatefulList<T> {
     pub state: ListState,
@@ -54,34 +46,70 @@ impl<T> StatefulList<T> {
     }
 }
 
-pub struct Context
-//<'a>
-{
+pub struct MarketCollector<M> {
+    provider: M,
+}
+impl<M> MarketCollector<M> {}
+
+pub struct OrderCollector<M> {
+    provider: M,
+}
+impl<M> OrderCollector<M> {}
+
+pub struct Context<M> {
     pub id: String,
     pub strategy_config: Arc<RwLock<StrategyConfig>>,
-    pub manifold: Arc<RwLock<api::manifold::ManifoldPlatform>>,
-    //pub questions: //Arc<RwLock<Vec<serde_json::Value>>>,
-    pub questions: Vec<serde_json::Value>,
-    //TODO: cross platforms
-    //pub questions: Vec<MarketStandarized>,
-    // pub selecteable_markets: StatefulList<&'a str>,
+    pub questions: Vec<String>,
+    pub executors: Vec<Box<dyn Executor<M>>>,
     pub exit: bool,
+    question_channel_capacity: usize,
 }
 
-impl Context
-//<'a>
-{
+impl<M: Sync + Send + Clone + 'static> Context<M> {
     pub fn new() -> Self {
-        let manifold = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
         let strategy_config = StrategyConfig::default();
-        let selecteable_markets =
-            StatefulList::with_items(vec!["Market 1", "Market 2", "Market 3"]);
-        Self {
-            manifold: Arc::new(RwLock::new(manifold)),
-            id: "default".to_string(),
-            strategy_config: Arc::new(RwLock::new(strategy_config)),
+        Context {
+            executors: vec![],
             questions: vec![],
+            id: "default".to_string(),
+            question_channel_capacity: 512,
+            strategy_config: Arc::new(RwLock::new(strategy_config)),
             exit: false,
         }
     }
+
+    pub fn with_question_channel_capacity(mut self, capacity: usize) -> Self {
+        self.question_channel_capacity = capacity;
+        self
+    }
+}
+
+impl<M: Send + Sync + Clone + 'static> Default for Context<M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> Context<M>
+where
+    M: Send + Sync + Clone + 'static,
+{
+    pub fn add_question(&mut self, question: String) {
+        self.questions.push(question);
+    }
+    //Core run loop. Spawn thread for each question/executo.
+    pub async fn run(self) -> Result<JoinSet<()>, Box<dyn std::error::Error>> {
+        let (tx, rx): (Sender<M>, Receiver<M>) = tokio::sync::broadcast::channel(100);
+        let set = JoinSet::new();
+        for question in self.questions {}
+        Ok(set)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::create_match;
+    use crate::Settings;
+    use tracing_subscriber::prelude::*;
 }

@@ -1,18 +1,15 @@
 use super::Result;
 use crate::Context;
 use clap::{Parser, Subcommand};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
     style::Stylize,
     symbols::border,
     text::{Line, Text},
-    widgets::{
-        block::{Position, Title},
-        Block, Paragraph, Widget, Wrap,
-    },
-    DefaultTerminal, Frame,
+    widgets::{block::Title, Block, Paragraph, Widget},
+    DefaultTerminal,
 };
 #[derive(Parser)]
 #[command(version, about)]
@@ -41,7 +38,7 @@ pub async fn parse_markets(markets: Vec<serde_json::Value>) -> Result<Vec<String
         .iter()
         .map(|market| {
             let question = market["question"].as_str().unwrap();
-            format!("{}", question)
+            question.to_string()
         })
         .collect::<Vec<String>>();
     Ok(selectable_markets)
@@ -61,7 +58,7 @@ pub fn draw_market_select(buf: &mut Buffer, markets: Vec<String>, area: Rect) {
     Paragraph::new(text).centered().render(area, buf);
 }
 
-pub fn handle_events(ctx: Context) -> std::io::Result<()> {
+pub fn handle_events<M>(ctx: Context<M>) -> std::io::Result<()> {
     match event::read()? {
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
             handle_key_event(ctx, key_event);
@@ -71,13 +68,9 @@ pub fn handle_events(ctx: Context) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn handle_key_event(ctx: Context, key_event: KeyEvent) {}
+pub fn handle_key_event<M>(ctx: Context<M>, key_event: KeyEvent) {}
 
 pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
-    unimplemented!()
-}
-
-pub fn draw(ctx: Context, frame: &mut Frame) {
     unimplemented!()
 }
 
