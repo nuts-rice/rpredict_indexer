@@ -231,15 +231,47 @@ Your answer will be used to use the tool so it must be very concise and make sur
 pub type MarketBundle = Vec<crate::Market>;
 
 #[async_trait]
-pub trait Executor<M>: Send + Sync + 'static {
+pub trait Executor<M>: Send + Sync {
     async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()>;
-    async fn execute(&self, markets: MarketBundle) -> anyhow::Result<()>;
+    async fn execute(&self, market: M) -> anyhow::Result<()>;
 }
+
+
+// pub struct ExecutorMap<M, F> {
+//     executor: Box<dyn Executor<M>>,
+//     f: F,
+// }
+// impl <M, F> ExecutorMap<M, F> {
+//     pub fn new(executor: Box<dyn Executor<M>>, f: F) -> Self {
+//         Self {
+//             executor,
+//             f,
+//         }
+//     }
+// }
+// #[async_trait]
+// impl <M1, M2, F> Executor<M1> for ExecutorMap<M2, F>
+// where M1: Send + Sync + 'static,
+//       M2: Send + Sync + 'static,
+//       F: Fn(M1) -> Option<M2> + Send + Sync + Clone + 'static,
+// {
+//     async fn execute(&self, market: M1) -> anyhow::Result<()> {
+//         let market = (self.f)(market);
+//         match market {
+//             Some(m) => self.executor.execute(m).await,
+//             None => Ok(()),
+                    
+//         }
+//     }
+
+//     async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()> {
+//         self.executor.init(question, outcome, tags).await
+//     }
+// }
 #[derive(Clone)]
-pub struct PolymarketExecutor<S: 'static + Send + Sync> {
-    provider: Arc<api::polymarket::PolymarketPlatform>,
+pub struct PolymarketExecutor {
+    platform: Arc<api::polymarket::PolymarketPlatform>,
     promptor: Promptor,
-    marker: std::marker::PhantomData<S>,
     //ExecutorBuilder<Self>
 }
 
@@ -248,18 +280,17 @@ pub struct PolymarketExecutor<S: 'static + Send + Sync> {
 //         Self(value)
 //     }
 // }
-impl<S: 'static + Sync + Send> PolymarketExecutor<S> {
-    pub fn new(provider: Arc<api::polymarket::PolymarketPlatform>, promptor: Promptor) -> Self {
+impl PolymarketExecutor {
+    pub fn new(platform: Arc<api::polymarket::PolymarketPlatform>, promptor: Promptor) -> Self {
         Self {
-            provider,
+            platform,
             promptor,
-            marker: std::marker::PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<S: 'static + Sync + Send> Executor<S> for PolymarketExecutor<S> {
+impl Executor<Market> for PolymarketExecutor {
     async fn init(
         &self,
         question: &str,
@@ -386,7 +417,7 @@ impl<S: 'static + Sync + Send> Executor<S> for PolymarketExecutor<S> {
         client.assistants().delete(&assistant.id).await?;
         Ok(())
     }
-    async fn execute(&self, market: MarketBundle) -> anyhow::Result<()> {
+    async fn execute(&self, market: Market) -> anyhow::Result<()> {
         tracing::info!("Polymarket Executor executing");
         let mut market_request = crate::admin::listener::MarketRequest::new();
         // for market in markets {
@@ -398,31 +429,24 @@ impl<S: 'static + Sync + Send> Executor<S> for PolymarketExecutor<S> {
 }
 
 #[derive(Clone)]
-pub struct ManifoldExecutor<S> {
-    provider: Arc<api::manifold::ManifoldPlatform>,
+pub struct ManifoldExecutor {
+    platform: Arc<api::manifold::ManifoldPlatform>,
     promptor: Promptor,
-    marker: std::marker::PhantomData<S>,
     //ExecutorBuilder<Self>
 }
 
-impl<S: Send + Sync + Clone> ManifoldExecutor<S> {
-    pub fn new(provider: Arc<api::manifold::ManifoldPlatform>, promptor: Promptor) -> Self {
+impl ManifoldExecutor {
+    pub fn new(platform: Arc<api::manifold::ManifoldPlatform>, promptor: Promptor) -> Self {
         Self {
-            provider,
+            platform,
             promptor,
-            marker: std::marker::PhantomData,
         }
     }
 }
 
-// impl From<ExecutorBuilder<Self>> for ManifoldExecutor {
-//     fn from(value: ExecutorBuilder<Self>) -> Self {
-//         Self(value)
-//     }
-// }
 
 #[async_trait]
-impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
+impl Executor<Market> for ManifoldExecutor {
     async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()> {
         let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
         let qdrant = Arc::new(RwLock::new(
@@ -437,16 +461,7 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
         let collection_name = "Manifold_collection";
         // let (tx, rx)  = tokio::sync::mpsc::channel(100);
         qdrant.read().unwrap().delete_collection(collection_name);
-        // ctx.strategy_config
-        //     .write()
-        //     .unwrap()
-        //     .qdrant
-        //     .create_collection(
-        //         CreateCollectionBuilder::new(collection_name.to_string())
-        //             .vectors_config(VectorParamsBuilder::new(512, Distance::Cosine)),
-        //     );
         let mut markets: Vec<serde_json::Value> = Vec::new();
-        // ctx.strategy_config.write().unwrap().collection_name = collection_name.to_string();
         for tag in tags {
             let market_data = platform.fetch_markets_by_terms(&tag).await.unwrap();
             let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
@@ -595,9 +610,111 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
         Ok(())
     }
 
-    async fn execute(&self, markets: MarketBundle) -> anyhow::Result<()> {
+    async fn execute(&self, market: Market) -> anyhow::Result<()> {
         let mut market_request = crate::admin::listener::MarketRequest::new();
-        let platform = &self.provider;
+        let platform = &self.platform;
+        let query = [("limit", "1")];
+        let client = async_openai::Client::new();
+        // let prompt =
+        //     self.promptor
+        //         .prompts_manifold_filter(trimmed_markets, trimmed_news, question, outcome);
+
+        // let assistant_request = CreateAssistantRequestArgs::default()
+        //     .instructions(
+        //         self.promptor
+        //             .superforecaster(question, outcome)
+        //             .await
+        //             .to_string(),
+        //     )
+        //     .model("gpt-4o")
+        //     .build()?;
+        // let assistant = client.assistants().create(assistant_request).await?;
+        // let assistant_id = assistant.id.clone();
+        // let thread = client
+        //     .threads()
+        //     .create(CreateThreadRequest::default())
+        //     .await?;
+        // let message = CreateMessageRequestArgs::default()
+        //     .role(MessageRole::User)
+        //     .content(prompt.clone())
+        //     .build()?;
+        // let _message = client
+        //     .threads()
+        //     .messages(&thread.id)
+        //     .create(message)
+        //     .await?;
+        // let run_request = CreateRunRequestArgs::default()
+        //     .assistant_id(assistant_id)
+        //     .build()?;
+        // let mut run = client
+        //     .threads()
+        //     .runs(&thread.id)
+        //     .create(run_request)
+        //     .await?;
+        // loop {
+        //     match run.status {
+        //         RunStatus::Completed => {
+        //             let messages = client.threads().messages(&thread.id).list(&query).await?;
+        //             for message_obj in messages.data {
+        //                 let message_contents = message_obj.content;
+        //                 for message_content in message_contents {
+        //                     match message_content {
+        //                         MessageContent::Text(text) => {
+        //                             let text_data = text.text;
+        //                             let annotations = text_data.annotations;
+        //                             println!("{}", text_data.value);
+        //                             println!("{annotations:?}");
+        //                         }
+        //                         MessageContent::ImageFile(_) | MessageContent::ImageUrl(_) => {
+        //                             eprintln!("Images not supported on terminal");
+        //                         }
+        //                         MessageContent::Refusal(refusal) => {
+        //                             println!("{refusal:?}");
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //             break;
+        //         }
+        //         RunStatus::Failed => {
+        //             println!("> Run Failed: {:#?}", run);
+        //             break;
+        //         }
+        //         RunStatus::Queued => {
+        //             println!("> Run Queued");
+        //         }
+        //         RunStatus::Cancelling => {
+        //             println!("> Run Cancelling");
+        //         }
+        //         RunStatus::Cancelled => {
+        //             println!("> Run Cancelled");
+        //             break;
+        //         }
+        //         RunStatus::Expired => {
+        //             println!("> Run Expired");
+        //             break;
+        //         }
+        //         RunStatus::RequiresAction => {
+        //             println!("> Run Requires Action");
+        //         }
+        //         RunStatus::InProgress => {
+        //             println!("> In Progress ...");
+        //         }
+        //         RunStatus::Incomplete => {
+        //             println!("> Run Incomplete");
+        //         }
+        //     }
+        //     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        //     run = client.threads().runs(&thread.id).retrieve(&run.id).await?;
+        // }
+        // client.threads().delete(&thread.id).await?;
+        // client.assistants().delete(&assistant.id).await?;
+        // Ok(())
+
+
+        market_request.add_market(market);
+        Ok(())
+        // let pending_market = self.platform.
         // for question in questions {
         //  market_request.add_market(question);
         // }
@@ -611,15 +728,13 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
         //     //     admin::listener::listen_for_requests(questions, cache, market_update_rx, ctx)
         //     // })
         // }
-        unimplemented!()
     }
 }
 
 #[derive(Clone)]
-pub struct MetaculusExecutor<S> {
+pub struct MetaculusExecutor {
     provider: Arc<api::metaculus::MetaculusPlatform>,
     promptor: Promptor,
-    marker: std::marker::PhantomData<S>,
 }
 
 // impl From<ExecutorBuilder<Self>> for MetaculusExecutor {
@@ -628,18 +743,17 @@ pub struct MetaculusExecutor<S> {
 //     }
 // }
 
-impl<S: Send + Sync + Clone> MetaculusExecutor<S> {
+impl MetaculusExecutor {
     pub fn new(provider: Arc<api::metaculus::MetaculusPlatform>, promptor: Promptor) -> Self {
         Self {
             provider,
             promptor,
-            marker: std::marker::PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<S: Send + Sync + Clone + 'static> Executor<S> for MetaculusExecutor<S> {
+impl Executor<Market> for MetaculusExecutor {
     async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()> {
         let platform = api::metaculus::MetaculusPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await.unwrap();
@@ -791,7 +905,7 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for MetaculusExecutor<S> {
         Ok(())
     }
 
-    async fn execute(&self, markets: MarketBundle) -> anyhow::Result<()> {
+    async fn execute(&self, markets: Market) -> anyhow::Result<()> {
         println!("Metaculus Executor executing");
         unimplemented!()
     }

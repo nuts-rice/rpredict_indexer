@@ -1,5 +1,5 @@
 use crate::context::Context;
-use crate::executor::executor::Executor;
+use crate::executor::executor::{Executor, ManifoldExecutor};
 use crate::types::{create_match, Market, Settings};
 use anyhow::Result;
 use api::Platform;
@@ -234,6 +234,17 @@ async fn main() -> Result<()> {
         .unwrap()
         .iter()
         .for_each(|q| context.add_question(q.to_string()));
+    let executor = Box::new(ManifoldExecutor::new(
+            Arc::new(api::manifold::ManifoldPlatform::from(
+                api::PlatformBuilder::default(),
+            )),
+            executor::executor::Promptor {},
+        ));
+    // let executor = ExecutorMap::new(executor |market| match market {
+    //     Market::NewMarket(m) => Some(m),
+    //     Market::MarketPosition(p) => Some(p),
+    // });
+    context.add_executor(executor);
     if let Ok(mut set) = context.run().await {
         while let Some(res) = set.join_next().await {
             tracing::info!("res: {:?}", res);

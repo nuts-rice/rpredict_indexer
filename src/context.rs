@@ -109,9 +109,14 @@ where
     pub fn add_question(&mut self, question: String) {
         self.questions.items.push(question);
     }
+
+    pub fn add_executor(&mut self, executor: Box<dyn Executor<M>>) {
+        self.executors.push(executor);
+    }
+
     //Core run loop. Spawn thread for each question/executo.
     pub async fn run(self) -> Result<JoinSet<()>, Box<dyn std::error::Error>> {
-        let (tx, rx): (Sender<M>, Receiver<M>) =
+        let (tx, _): (Sender<M>, _) =
             tokio::sync::broadcast::channel(self.question_channel_capacity);
         let mut set = JoinSet::new();
         for executor in self.executors {
@@ -122,7 +127,9 @@ where
 
                     match rx.recv().await {
                         //TODO: un-dummy this
-                        Ok(question) => match executor.init("Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?", "The 10 year treasury yield closing at 4% or higher on 12/31/2024", vec!["us-economics".to_string()]).await {
+                        Ok(market) => match executor.execute(market).await
+                            //"Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?", "The 10 year treasury yield closing at 4% or higher on 12/31/2024", vec!["us-economics".to_string()]).await 
+                            {
                             Ok(_) => {}
                             Err(e) => tracing::error!("error executing action: {}", e),
                         },
@@ -190,4 +197,16 @@ mod tests {
     use crate::create_match;
     use crate::Settings;
     use tracing_subscriber::prelude::*;
+
+    // #[tokio::test]
+    // async fn test_context_launch() {
+    // tracing_subscriber::registry()
+    //     .with(
+    //         tracing_subscriber::EnvFilter::try_from_default_env()
+    //             .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+    //     )
+    //     .with(tracing_subscriber::fmt::layer())
+    //     .init();
+
+    // } 
 }
