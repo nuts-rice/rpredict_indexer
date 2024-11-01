@@ -32,6 +32,7 @@ use serde::Deserialize;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod admin;
 pub mod api;
+pub mod collector;
 pub mod commands;
 pub mod context;
 pub mod db;
