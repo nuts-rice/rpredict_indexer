@@ -2,11 +2,7 @@ use clap::{Arg, ArgMatches, Command};
 use qdrant_client::{config::QdrantConfig, Qdrant};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use toml::Value;
 type OutcomeSeries = HashMap<String, Vec<Tick>>;
 

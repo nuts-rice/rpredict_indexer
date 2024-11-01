@@ -227,20 +227,13 @@ Your answer will be used to use the tool so it must be very concise and make sur
         The question {}; has a likelihood (float)% for outcome of (str).", question, outcome, outcome, question).to_string()
     }
 }
+
+pub type MarketBundle = Vec<crate::Market>;
+
 #[async_trait]
 pub trait Executor<M>: Send + Sync + 'static {
-    async fn init(
-        &self,
-        question: &str,
-        outcome: &str,
-        tags: Option<Vec<String>>,
-    ) -> anyhow::Result<()>;
-    async fn execute(
-        &self,
-        rx: MarketUpdateRcv,
-        markets: Vec<M>,
-        strat_config: StrategyConfig,
-    ) -> anyhow::Result<()>;
+    async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()>;
+    async fn execute(&self, markets: MarketBundle) -> anyhow::Result<()>;
 }
 #[derive(Clone)]
 pub struct PolymarketExecutor<S: 'static + Send + Sync> {
@@ -271,7 +264,7 @@ impl<S: 'static + Sync + Send> Executor<S> for PolymarketExecutor<S> {
         &self,
         question: &str,
         outcome: &str,
-        tags: Option<Vec<String>>,
+        tags: Vec<String>,
         //<'a>,
     ) -> anyhow::Result<()> {
         let platform = api::polymarket::PolymarketPlatform::from(PlatformBuilder::default());
@@ -393,14 +386,9 @@ impl<S: 'static + Sync + Send> Executor<S> for PolymarketExecutor<S> {
         client.assistants().delete(&assistant.id).await?;
         Ok(())
     }
-    async fn execute(
-        &self,
-        rx: MarketUpdateRcv,
-        markets: Vec<S>,
-        strat_config: StrategyConfig,
-    ) -> anyhow::Result<()> {
+    async fn execute(&self, market: MarketBundle) -> anyhow::Result<()> {
         tracing::info!("Polymarket Executor executing");
-        // let mut market_request = crate::admin::listener::MarketRequestRcv;
+        let mut market_request = crate::admin::listener::MarketRequest::new();
         // for market in markets {
         //     market_request
         // }
@@ -435,12 +423,7 @@ impl<S: Send + Sync + Clone> ManifoldExecutor<S> {
 
 #[async_trait]
 impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
-    async fn init(
-        &self,
-        question: &str,
-        outcome: &str,
-        tags: Option<Vec<String>>,
-    ) -> anyhow::Result<()> {
+    async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()> {
         let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
         let qdrant = Arc::new(RwLock::new(
             Qdrant::from_url("http://localhost:6334").build().unwrap(),
@@ -464,16 +447,14 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
         //     );
         let mut markets: Vec<serde_json::Value> = Vec::new();
         // ctx.strategy_config.write().unwrap().collection_name = collection_name.to_string();
-        if let Some(tags) = tags {
-            for tag in tags {
-                let market_data = platform.fetch_markets_by_terms(&tag).await.unwrap();
-                let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
-                market_data.iter().for_each(|m| {
-                    let market_summarized = parse_manifold_market(m.clone()).unwrap();
-                    // ctx.questions.push(market_summarized.clone().to_string());
-                    markets.push(market_summarized);
-                })
-            }
+        for tag in tags {
+            let market_data = platform.fetch_markets_by_terms(&tag).await.unwrap();
+            let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
+            market_data.iter().for_each(|m| {
+                let market_summarized = parse_manifold_market(m.clone()).unwrap();
+                // ctx.questions.push(market_summarized.clone().to_string());
+                markets.push(market_summarized);
+            })
         }
 
         //         data.iter().for_each(|d| {
@@ -614,12 +595,13 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for ManifoldExecutor<S> {
         Ok(())
     }
 
-    async fn execute(
-        &self,
-        rx: MarketUpdateRcv,
-        questions: Vec<S>,
-        strat_config: StrategyConfig,
-    ) -> anyhow::Result<()> {
+    async fn execute(&self, markets: MarketBundle) -> anyhow::Result<()> {
+        let mut market_request = crate::admin::listener::MarketRequest::new();
+        let platform = &self.provider;
+        // for question in questions {
+        //  market_request.add_market(question);
+        // }
+
         // let platform = ctx.manifold.read().unwrap();
         // let strat_config = ctx.strategy_config.read().unwrap();
         // let questions = ctx.questions;
@@ -658,12 +640,7 @@ impl<S: Send + Sync + Clone> MetaculusExecutor<S> {
 
 #[async_trait]
 impl<S: Send + Sync + Clone + 'static> Executor<S> for MetaculusExecutor<S> {
-    async fn init(
-        &self,
-        question: &str,
-        outcome: &str,
-        tags: Option<Vec<String>>,
-    ) -> anyhow::Result<()> {
+    async fn init(&self, question: &str, outcome: &str, tags: Vec<String>) -> anyhow::Result<()> {
         let platform = api::metaculus::MetaculusPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await.unwrap();
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
@@ -671,18 +648,16 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for MetaculusExecutor<S> {
         // tracing::debug!("News: {:?}", news);
         let mut questions_with_probability: Vec<serde_json::Value> = Vec::new();
 
-        if let Some(tags) = tags {
-            for tag in tags {
-                let data = platform.fetch_markets_by_terms(&tag).await.unwrap();
-                data.iter().filter(|d| d.nr_forecasters >= 4).for_each(|d| {
-                    let question_with_probability = serde_json::json!({
-                        "title": d.title,
-                        "number_of_forecasters": d.nr_forecasters,
-                        "forecasts_count": d.forecasts_count,
-                    });
-                    questions_with_probability.push(question_with_probability);
+        for tag in tags {
+            let data = platform.fetch_markets_by_terms(&tag).await.unwrap();
+            data.iter().filter(|d| d.nr_forecasters >= 4).for_each(|d| {
+                let question_with_probability = serde_json::json!({
+                    "title": d.title,
+                    "number_of_forecasters": d.nr_forecasters,
+                    "forecasts_count": d.forecasts_count,
                 });
-            }
+                questions_with_probability.push(question_with_probability);
+            });
         }
 
         // // let question_with_probability = serde_json::json!({
@@ -816,12 +791,7 @@ impl<S: Send + Sync + Clone + 'static> Executor<S> for MetaculusExecutor<S> {
         Ok(())
     }
 
-    async fn execute(
-        &self,
-        rx: MarketUpdateRcv,
-        questions: Vec<S>,
-        strat_config: StrategyConfig,
-    ) -> anyhow::Result<()> {
+    async fn execute(&self, markets: MarketBundle) -> anyhow::Result<()> {
         println!("Metaculus Executor executing");
         unimplemented!()
     }
@@ -1022,8 +992,8 @@ fn filter_news() -> Result<Vec<serde_json::Value>> {
 }
 
 mod tests {
-    
-    
+    use super::*;
+    use tracing_subscriber::prelude::*;
 
     #[tokio::test]
     async fn test_polymarket_executor() {

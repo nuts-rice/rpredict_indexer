@@ -23,6 +23,15 @@ pub struct MarketRequest {
     uuid: Option<Uuid>,
 }
 
+impl From<Market> for MarketRequest {
+    fn from(market: Market) -> Self {
+        Self {
+            markets: vec![market],
+            uuid: None,
+        }
+    }
+}
+
 impl MarketRequest {
     // async fn process_market_request(self, mut market_request_rx: MarketRequestRcv, markets_list: Arc<RwLock<Vec<serde_json::Value>>) {
     //     loop {
@@ -32,6 +41,26 @@ impl MarketRequest {
     //         }
     //     }
     // }
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn push_market<S: Into<Market>>(mut self, market: S) -> Self {
+        self.markets.push(market.into());
+        self
+    }
+
+    pub fn add_market<S: Into<Market>>(&mut self, market: S) {
+        self.markets.push(market.into());
+    }
+
+    pub fn markets(&self) -> &Vec<Market> {
+        &self.markets
+    }
+
+    pub fn uuid(&self) -> &Option<Uuid> {
+        &self.uuid
+    }
 
     async fn process_tick_request(
         self,

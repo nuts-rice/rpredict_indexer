@@ -8,7 +8,7 @@ use axum::{
     extract::Query,
     response::{Html, IntoResponse},
 };
-use crossterm::style::Stylize;
+use context::StatefulList;
 use db::{manifold::ManifoldMarket, metaculus::MetaculusMarket, polymarket::PolymarketResult};
 use ratatui::widgets::{Block, List, ListItem};
 use ratatui::{
@@ -195,41 +195,6 @@ async fn render_metaculus_markets(
 
 // fn run_markets<B:
 
-fn run_markets<M>(ctx: Context<M>) -> std::io::Result<()> {
-    let mut terminal = ratatui::init();
-    terminal.clear();
-    let app_result = run(terminal, ctx);
-    ratatui::restore();
-    app_result
-}
-
-fn render_market_select(markets: Vec<String>) -> std::io::Result<()> {
-    unimplemented!()
-}
-
-fn run<M>(mut terminal: DefaultTerminal, ctx: Context<M>) -> std::io::Result<()> {
-    let markets: Vec<ListItem> = ctx
-        .questions
-        .iter()
-        .map(|q| ListItem::from(q.to_string()))
-        .collect();
-    let markets = List::new(markets)
-        .block(Block::bordered().title("Markets"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol("> ");
-    loop {
-        terminal.draw(|frame| {
-            frame.render_widget(markets.clone(), frame.area());
-        })?;
-
-        if let event::Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                return Ok(());
-            }
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
@@ -263,13 +228,19 @@ async fn main() -> Result<()> {
         "questions_list: {:#?}",
         questions_list_rwlock.read().unwrap()
     );
-    let questions_clone = questions_list_rwlock.read().unwrap();
     let mut context: Context<Market> = Context::default();
     questions_list_rwlock
         .read()
         .unwrap()
         .iter()
         .for_each(|q| context.add_question(q.to_string()));
+    if let Ok(mut set) = context.run().await {
+        while let Some(res) = set.join_next().await {
+            tracing::info!("res: {:?}", res);
+        }
+    }
+    //
+    //
     // tracing::debug!("context questions: {:#?}", &context.questions);
     // context.questions.
 
@@ -292,7 +263,8 @@ async fn main() -> Result<()> {
     // .unwrap();
     // tracing::debug!("questions: {:#?}", questions[0]);
     // axum::serve(listener, app).await.unwrap();
-    run_markets(context);
 
+    // TODO: figure out how to do the terminal
+    // run_markets(&mut context);
     Ok(())
 }
