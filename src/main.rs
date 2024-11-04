@@ -252,25 +252,27 @@ async fn main() {
     .finish();
 
     tracing::debug!("connecting to graphql");
-    let tags: Vec<String> = vec!["GPT-5".to_string(), "AI".to_string(), "OpenAI".to_string()];
+    let tags: Vec<String> = vec!["us-economics".to_string(), "economics".to_string()];
     let mut context = Context::new();
     let executor =
         ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
     let result = executor
         .init(
-            "What is the probability of GPT-5 being availiable by 2025",
-            "GPT-5 being availiable by 2025",
+            "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?",
+            "10 year treasury yield at closing on 12/31/2024 be 4% or higher",
             Some(tags),
             &mut context,
         )
         .await
         .unwrap();
+    tracing::debug!("result: {:#?}", result);
 
     let mut dummy_questions = vec![
         "What is the probability of GPT-5 being availiable by 2025".to_string(),
         "What is the probability of Stalker 2 being released by 2025".to_string(),
         "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?".to_string(),
     ];
+    context.questions.push(dummy_questions.into());
 
     // context.questions.
 
@@ -293,5 +295,5 @@ async fn main() {
     // .unwrap();
     // tracing::debug!("questions: {:#?}", questions[0]);
     // axum::serve(listener, app).await.unwrap();
-    run_markets(context);
+    // run_markets(context);
 }

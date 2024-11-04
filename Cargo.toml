@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 ansi_term = { version = "0.12.1", features = ["derive_serde_style", "serde"] }
+anyhow = "1.0.92"
 async-graphql = "7.0.9"
 async-graphql-axum = "7.0.9"
 async-openai = { version = "0.25.0", features = ["realtime"] }
@@ -20,6 +21,7 @@ futures-util = "0.3.30"
 http-body-util = "0.1.2"
 hyper = { version = "1.4.1", features = ["full"] }
 hyper-util = { version = "0.1.8", features = ["full"] }
+jsonrpsee = { version = "0.24.7", features = ["async-client", "http-client"] }
 once_cell = "1.19.0"
 ort = "1.16.3"
 qdrant-client = "1.12.1"
@@ -36,6 +38,7 @@ sqlx = "0.8.2"
 tavily = "1.0.0"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["full"] }
+tokio-stream = "0.1.16"
 tokio-tungstenite = "0.24.0"
 tower = "0.5.1"
 tracing = "0.1.40"

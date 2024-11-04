@@ -1,7 +1,9 @@
 use crate::{
     api::{self, *},
-    manifold::ManifoldMarket,
+    manifold::{ManifoldMarket, ManifoldPosition},
 };
+use anyhow::Result;
+use axum::async_trait;
 use chrono::{DateTime, Utc};
 use clap::{Arg, Command};
 use qdrant_client::{config::QdrantConfig, Qdrant};
@@ -11,7 +13,33 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex, RwLock},
 };
-type OutcomeSeries = HashMap<String, Vec<Tick>>;
+use tokio_stream::Stream;
+use tokio_stream::StreamExt;
+
+pub type CollectorStream<'a, M> = Box<dyn Stream<Item = M> + Send + 'a>;
+
+#[async_trait]
+pub trait Collector<M>: Send + Sync {
+    fn collect(&self) -> Result<CollectorStream<'_, M>>;
+}
+pub trait Executor<M>: Send + Sync {
+    fn execute(&self, m: M);
+}
+
+#[async_trait]
+pub trait Strategy<M>: Send + Sync {
+    fn process_market(&self, m: M);
+    fn process_tick(&self, m: M);
+    fn process_position(&self, m: M);
+    fn process_news(&self, m: M);
+}
+
+pub enum MarketEvent {
+    Market(MarketStandarized),
+    Tick(Tick),
+    Position(ManifoldPosition),
+    // News(News),
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum OutcomeType {
