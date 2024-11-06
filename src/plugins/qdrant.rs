@@ -67,26 +67,26 @@ pub async fn aggregate_data(
 
 // }
 
-pub async fn update_market(
-    market: MarketStandarized,
-    tick: Tick,
-    outcome: &str,
-    market_tx: &MarketUpdateSend,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match outcome {
-        "YES" => {
-            market.pool.unwrap().YES.push(tick.clone());
-        }
-        "NO" => {
-            market.pool.unwrap().NO.push(tick.clone());
-        }
-        _ => {}
-    }
-    let _ = market_tx
-        .send(MarketUpdateResult {
-            market_idx: market.idx,
-            tick,
-        })
-        .await;
-    Ok(())
-}
+// pub async fn update_market(
+//     market: MarketStandarized,
+//     tick: Tick,
+//     outcome: &str,
+//     market_tx: &MarketUpdateSend,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     match outcome {
+//         "YES" => {
+//             market.unwrap().YES.push(tick.clone());
+//         }
+//         "NO" => {
+//             market.pool.unwrap().NO.push(tick.clone());
+//         }
+//         _ => {}
+//     }
+//     let _ = market_tx
+//         .send(MarketUpdateResult {
+//             market_idx: market.idx,
+//             tick,
+//         })
+//         .await;
+//     Ok(())
+// }

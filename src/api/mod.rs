@@ -70,11 +70,61 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_events(&self, limit: Option<u64>, offset: u64) -> Result<Vec<Self::Event>>;
     async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>>;
     async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>>;
+    async fn subscribe_to(&self) -> Result<()>;
     type Market;
     type Event;
     type Position;
     const ENDPOINT: &'static str;
     const SORT: &'static str;
+}
+#[derive(Debug, Clone)]
+pub struct MarketConvertError {
+    data: String,
+    message: String,
+    level: u8,
+}
+impl std::fmt::Display for MarketConvertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}: {}", self.message, self.data)
+    }
+}
+
+async fn base_request<T: for<'de> serde::Deserialize<'de>>(
+    req: reqwest_middleware::RequestBuilder,
+) -> std::result::Result<T, MarketConvertError> {
+    let req_clone = req.try_clone().unwrap().build().unwrap();
+    let final_url = req_clone.url();
+    let response = match req.send().await {
+        Ok(response) => Ok(response),
+        Err(e) => Err(MarketConvertError {
+            data: e.to_string(),
+            message: "Error sending request.".to_string(),
+            level: 5,
+        }),
+    }
+    .unwrap();
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|e| MarketConvertError {
+            data: final_url.to_string(),
+            message: e.to_string(),
+            level: 4,
+        })
+        .unwrap();
+    if !status.is_success() {
+        return Err(MarketConvertError {
+            data: text.to_owned(),
+            message: format!("Query to {} returned status code {}.", final_url, status),
+            level: 4,
+        });
+    }
+    serde_json::from_str(&text).map_err(|e| MarketConvertError {
+        data: text,
+        message: e.to_string(),
+        level: 3,
+    })
 }
 
 impl<P: Platform + Any> PlatformBuilder<P> {

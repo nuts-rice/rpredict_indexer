@@ -1,26 +1,38 @@
 use crate::{
     api::{self, *},
     manifold::{ManifoldMarket, ManifoldPosition},
+    StandardMarket,
 };
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
+use clap::ValueEnum;
 use clap::{Arg, Command};
+use diesel::upsert::excluded;
+use diesel::{pg::PgConnection, prelude::*, Connection, Insertable};
 use qdrant_client::{config::QdrantConfig, Qdrant};
 use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    str::FromStr,
     sync::{Arc, Mutex, RwLock},
 };
 use tokio_stream::Stream;
 use tokio_stream::StreamExt;
 
 pub type CollectorStream<'a, M> = Box<dyn Stream<Item = M> + Send + 'a>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
+pub enum Platform {
+    Manifold,
+    Metaculus,
+    Polymarket,
+}
 
 #[async_trait]
 pub trait Collector<M>: Send + Sync {
-    fn collect(&self) -> Result<CollectorStream<'_, M>>;
+    async fn collect_all(&self) -> Result<Vec<MarketStandarized>>;
+    async fn collect_by_id(&self, id: &str) -> Result<MarketStandarized>;
 }
 pub trait Executor<M>: Send + Sync {
     fn execute(&self, m: M);
@@ -41,34 +53,54 @@ pub enum MarketEvent {
     // News(News),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 enum OutcomeType {
     BINARY,
     MULTIPLE_CHOICE,
     POLL,
 }
 
-#[derive(Deserialize, Debug, Serialize, Clone)]
+impl FromStr for OutcomeType {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "BINARY" => Ok(OutcomeType::BINARY),
+            "MULTIPLE_CHOICE" => Ok(OutcomeType::MULTIPLE_CHOICE),
+            "POLL" => Ok(OutcomeType::POLL),
+            _ => Err(anyhow::anyhow!("Invalid OutcomeType")),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Insertable, AsChangeset)]
+#[diesel(table_name = market)]
 pub struct MarketStandarized {
-    pub question: String,
-    pub idx: usize,
-    pub created_time: i64,
-    pub close_time: i64,
-    pub total_liquidity: i32,
-    pub outcome_type: Option<OutcomeType>,
-    pub pool: Option<BetPool>,
-    pub indicators: Option<Indicators>,
+    title: String,
+    platform: String,
+    platform_id: String,
+    created_date: DateTime<Utc>,
+    close_time: DateTime<Utc>,
+    category: String,
+    //pub outcome_type: Option<OutcomeType>,
+    prob_at_midpoint: f32,
+    prob_at_close: f32,
+    prob_each_pct: Vec<f32>,
+    prob_each_date: serde_json::Value,
+    prob_time_avg: f32,
+    resolution: f32,
+    number_traders: i32,
+    // pub indicators: Option<Indicators>,
     //TODO: add this when can handle multiple choice
     // pub outcome_series: Vec<OutcomeSeries>,
 }
 
-#[derive(Deserialize, Debug, Serialize, Clone)]
-pub struct MarketOutcome {
-    outcome: String,
-    idx: usize,
-}
+// #[derive(Deserialize, Debug, Serialize, Clone)]
+// pub struct MarketOutcome {
+//     outcome: String,
+//     idx: usize,
+// }
 
-#[derive(Deserialize, Debug, Serialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct Indicators {
     num_forecasts: i32,
     num_forecasters: i32,
@@ -78,23 +110,89 @@ pub struct Indicators {
     votes: i32,
     stars: i32,
 }
-#[derive(Deserialize, Debug, Serialize, Clone)]
-pub struct BetPool {
-    pub NO: Vec<Tick>,
-    pub YES: Vec<Tick>,
-}
+// #[derive(Deserialize, Debug, Serialize, Clone)]
+// pub struct BetPool {
+//     pub NO: Vec<Tick>,
+//     pub YES: Vec<Tick>,
+// }
 
 #[derive(Deserialize, Debug, Serialize, Clone)]
-
 pub enum StrategyType {
     ARBITRAGE,
     MARKETMAKING,
 }
 
-#[derive(Deserialize, Debug, Serialize, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Tick {
     pub timestamp: DateTime<Utc>,
-    pub volume: f32,
+    pub probability: f32,
+}
+
+pub trait MarketStandarizer {
+    fn debug(&self) -> String;
+    fn num_traders(&self) -> i32;
+    fn platform(&self) -> String;
+    fn platform_id(&self) -> String;
+    fn close_date(&self) -> anyhow::Result<DateTime<Utc>>;
+    fn create_date(&self) -> anyhow::Result<DateTime<Utc>>;
+    fn category(&self) -> String;
+    fn resolution(&self) -> anyhow::Result<f32>;
+    fn ticks(&self) -> Vec<Tick>;
+    fn prob_at_time(&self, time: DateTime<Utc>) -> anyhow::Result<f32> {
+        if time < self.create_date()? {
+            return Err(anyhow::anyhow!("Time is before market creation"));
+        }
+        let mut prev_prob = 0.5;
+        for tick in self.ticks() {
+            if tick.probability < 0.0 || 1.0 < tick.probability {
+                return Err(anyhow::anyhow!("Probability out of bounds"));
+            }
+            if tick.timestamp > time {
+                return Ok(prev_prob);
+            }
+
+            prev_prob = tick.probability;
+        }
+        match self.ticks().last() {
+            Some(tick) => Ok(tick.probability),
+            None => Ok(0.5),
+        }
+    }
+    fn prob_duration_before_close(&self, dt: chrono::Duration) -> Result<f32> {
+        unimplemented!()
+    }
+    fn prob_at_percent(&self, percent: f32) -> anyhow::Result<f32> {
+        unimplemented!()
+    }
+    fn prob_time_avg_between(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Result<f32> {
+        unimplemented!()
+    }
+    fn prob_each_date(&self) -> anyhow::Result<serde_json::Value> {
+        unimplemented!()
+    }
+}
+
+table! {
+    market (id) {
+    id -> Int4,
+    title -> Varchar,
+    platform -> Varchar,
+    platform_id -> Varchar,
+    idx -> Int4,
+    category -> Varchar,
+    created_date -> Timestamptz,
+    close_time -> Timestamptz,
+    total_liquidity -> Int4,
+    outcome_type -> Varchar,
+    prob_at_midpoint -> Float4,
+    prob_at_close -> Float4,
+    prob_each_pct -> Array<Float4>,
+    prob_each_date -> Jsonb,
+    prob_time_avg -> Float4,
+    resolution -> Float4,
+    number_traders -> Int4,
+    // indicators -> Jsonb,
+    }
 }
 
 #[derive(Clone)]

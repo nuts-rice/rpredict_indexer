@@ -119,6 +119,9 @@ impl Platform for GammaPlatform {
     async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>> {
         unimplemented!()
     }
+    async fn subscribe_to(&self) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 #[cfg(test)]

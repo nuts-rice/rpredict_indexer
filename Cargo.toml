@@ -16,6 +16,7 @@ axum-server = "0.7.1"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.20", features = ["cargo", "derive"] }
 crossterm = "0.28.1"
+diesel = { version = "2.2.4", features = ["chrono", "postgres", "serde_json"] }
 futures-channel = "0.3.30"
 futures-util = "0.3.30"
 http-body-util = "0.1.2"
@@ -38,7 +39,7 @@ sqlx = "0.8.2"
 tavily = "1.0.0"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["full"] }
-tokio-stream = "0.1.16"
+tokio-stream = { version = "0.1.16", features = ["sync"] }
 tokio-tungstenite = "0.24.0"
 tower = "0.5.1"
 tracing = "0.1.40"

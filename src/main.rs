@@ -112,7 +112,7 @@ async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usiz
         let question_card: String = format!(
             r#"
             <div>
-        <h2>{} </h2>
+        <h2>{:?} </h2>
         </div>
         "#,
             &markets[i]

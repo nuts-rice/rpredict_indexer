@@ -1,10 +1,14 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
-use crate::manifold::ManifoldEvent;
-use crate::model::manifold::ManifoldMarket;
+use crate::api::base_request;
+use crate::db;
+use crate::manifold::{ExtraInfo, ManifoldEvent};
 use crate::model::manifold::ManifoldPosition;
+use crate::model::manifold::{Bet, ManifoldMarket, MarketFull};
+use crate::types::Tick;
 
 use async_trait::async_trait;
+use reqwest_middleware::ClientWithMiddleware;
 pub struct ManifoldPlatform(PlatformBuilder<Self>);
 
 //TODO: use this to grab tags
@@ -55,7 +59,17 @@ impl Platform for ManifoldPlatform {
     }
 
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {
-        unimplemented!()
+        let builder = &self.0;
+        let url = format!("https://api.manifold.markets/v0/market/{}", id);
+        tracing::debug!("URL: {:?}", url);
+        let response = builder
+            .client
+            .get(url)
+            .send()
+            .await?
+            .json::<Self::Market>()
+            .await?;
+        Ok(response)
     }
     async fn fetch_json(&self) -> Result<Vec<serde_json::Value>> {
         let builder = &self.0;
@@ -143,6 +157,93 @@ impl Platform for ManifoldPlatform {
 
         Ok(response)
     }
+    async fn subscribe_to(&self) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+async fn probability_series(id: &str) -> Vec<(f64, f64)> {
+    use super::manifold::*;
+    let platform = ManifoldPlatform::from(PlatformBuilder::default());
+    let mut trimmed_markets: Vec<serde_json::Value> = Vec::new();
+    let bets = platform.fetch_orderbook(id).await.unwrap();
+
+    if bets.len() == 0 {
+        return vec![];
+    }
+    tracing::debug!("Bets: {:?}", bets);
+    let market = platform.fetch_question_by_id(id).await;
+    tracing::debug!("Market: {:?}", market);
+
+    unimplemented!()
+}
+async fn get_extra_data(
+    client: &ClientWithMiddleware,
+    market: ManifoldMarket,
+) -> Result<MarketFull> {
+    let mut before: Option<String> = None;
+    let mut full_bets: Vec<Bet> = Vec::new();
+    let url = "https://api.manifold.markets/v0/bets";
+    loop {
+        let bets: Vec<Bet> = base_request(client.get(format!(
+            "{url}?contractId={}&limit=100&before={:?}",
+            market.id, &before
+        )))
+        .await
+        .unwrap();
+        if bets.len() == 100 {
+            full_bets.extend(bets);
+            before = Some(full_bets.last().unwrap().id.to_string());
+        } else {
+            full_bets.extend(bets);
+            break;
+        }
+    }
+    let extra_info: ExtraInfo = base_request(client.get(format!(
+        "https://api.manifold.markets/v0/market/{}",
+        market.id
+    )))
+    .await
+    .unwrap();
+    Ok(MarketFull {
+        market: market.clone(),
+        bets: full_bets.clone(),
+        ticks: get_ticks(full_bets.clone()).unwrap(),
+        extraInfo: extra_info,
+    })
+}
+fn is_valid(market: ManifoldMarket) -> bool {
+    market.isResolved
+        && market.mechanism == "cpmm-1"
+        && market.outcomeType == "BINARY"
+        && market.volume > 0.0
+        && market.resolution != Some("CANCEL".to_string())
+}
+
+fn get_ticks(mut bets: Vec<Bet>) -> Result<Vec<Tick>> {
+    unimplemented!()
+}
+
+fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
+    let probability: String = if let Some(probability) = market.probability {
+        probability.to_string()
+    } else {
+        "".to_string()
+    };
+    // let pool: [String; 2] = if let Some(pool) = market.pool {
+    //     [
+    //         format!("Yes: {}", pool.YES.to_string()),
+    //         format!("No: {}", pool.NO.to_string()),
+    //     ]
+    // } else {
+    //     ["0".to_string(), "0".to_string()]
+    // };
+    let market_summarized = serde_json::json!({
+        "question": market.question,
+        "probability": probability,
+        // "pool": pool,
+    });
+    Ok(market_summarized)
 }
 
 mod tests {

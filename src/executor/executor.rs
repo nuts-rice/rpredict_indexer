@@ -927,18 +927,18 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
     } else {
         "".to_string()
     };
-    let pool: [String; 2] = if let Some(pool) = market.pool {
-        [
-            format!("Yes: {}", pool.YES.to_string()),
-            format!("No: {}", pool.NO.to_string()),
-        ]
-    } else {
-        ["0".to_string(), "0".to_string()]
-    };
+    // let pool: [String; 2] = if let Some(pool) = market.pool {
+    //     [
+    //         format!("Yes: {}", pool.YES.to_string()),
+    //         format!("No: {}", pool.NO.to_string()),
+    //     ]
+    // } else {
+    //     ["0".to_string(), "0".to_string()]
+    // };
     let market_summarized = serde_json::json!({
         "question": market.question,
         "probability": probability,
-        "pool": pool,
+    //    "pool": pool,
     });
     Ok(market_summarized)
 }

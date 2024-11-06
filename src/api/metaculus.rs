@@ -138,6 +138,9 @@ impl Platform for MetaculusPlatform {
         tracing::debug!("questions: {:?}", questions);
         Ok(questions)
     }
+    async fn subscribe_to(&self) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 #[cfg(test)]
