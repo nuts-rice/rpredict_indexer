@@ -73,6 +73,17 @@ impl FromStr for OutcomeType {
 }
 
 #[derive(Debug, Serialize, Insertable, AsChangeset)]
+#[diesel(table_name = article)]
+pub struct Article {
+    source: String,
+    title: String,
+    content: String,
+    published_date: DateTime<Utc>,
+    url: String,
+    description: String,
+}
+
+#[derive(Debug, Serialize, Insertable, AsChangeset)]
 #[diesel(table_name = market)]
 pub struct MarketStandarized {
     title: String,
@@ -169,6 +180,18 @@ pub trait MarketStandarizer {
     }
     fn prob_each_date(&self) -> anyhow::Result<serde_json::Value> {
         unimplemented!()
+    }
+}
+
+table! {
+    article (id) {
+        id -> Int4,
+        source -> Varchar,
+        title -> Varchar,
+        content -> Text,
+        published_date -> Timestamptz,
+        url -> Varchar,
+        description -> Varchar,
     }
 }
 

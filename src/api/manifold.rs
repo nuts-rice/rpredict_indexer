@@ -4,7 +4,7 @@ use crate::api::base_request;
 use crate::db;
 use crate::manifold::{ExtraInfo, ManifoldEvent};
 use crate::model::manifold::ManifoldPosition;
-use crate::model::manifold::{Bet, ManifoldMarket, MarketFull};
+use crate::model::manifold::{Bet, ManifoldMarket};
 use crate::types::Tick;
 
 use async_trait::async_trait;
@@ -162,8 +162,10 @@ impl Platform for ManifoldPlatform {
     }
 }
 
-async fn probability_series(id: &str) -> Vec<(f64, f64)> {
+async fn probability_series(id: &str) -> Vec<(u64, f64)> {
     use super::manifold::*;
+    let times: Vec<u64> = vec![];
+    let probabilities: Vec<f64> = vec![];
     let platform = ManifoldPlatform::from(PlatformBuilder::default());
     let mut trimmed_markets: Vec<serde_json::Value> = Vec::new();
     let bets = platform.fetch_orderbook(id).await.unwrap();
@@ -171,46 +173,47 @@ async fn probability_series(id: &str) -> Vec<(f64, f64)> {
     if bets.len() == 0 {
         return vec![];
     }
-    tracing::debug!("Bets: {:?}", bets);
-    let market = platform.fetch_question_by_id(id).await;
-    tracing::debug!("Market: {:?}", market);
+    let market = platform.fetch_question_by_id(id).await.unwrap();
+    let trimmed_market = parse_manifold_market(market).unwrap();
 
     unimplemented!()
 }
 async fn get_extra_data(
     client: &ClientWithMiddleware,
     market: ManifoldMarket,
-) -> Result<MarketFull> {
-    let mut before: Option<String> = None;
-    let mut full_bets: Vec<Bet> = Vec::new();
-    let url = "https://api.manifold.markets/v0/bets";
-    loop {
-        let bets: Vec<Bet> = base_request(client.get(format!(
-            "{url}?contractId={}&limit=100&before={:?}",
-            market.id, &before
-        )))
-        .await
-        .unwrap();
-        if bets.len() == 100 {
-            full_bets.extend(bets);
-            before = Some(full_bets.last().unwrap().id.to_string());
-        } else {
-            full_bets.extend(bets);
-            break;
-        }
-    }
-    let extra_info: ExtraInfo = base_request(client.get(format!(
-        "https://api.manifold.markets/v0/market/{}",
-        market.id
-    )))
-    .await
-    .unwrap();
-    Ok(MarketFull {
-        market: market.clone(),
-        bets: full_bets.clone(),
-        ticks: get_ticks(full_bets.clone()).unwrap(),
-        extraInfo: extra_info,
-    })
+) -> Result<ManifoldMarket> {
+    unimplemented!()
+    // let mut before: Option<String> = None;
+    // let mut full_bets: Vec<Bet> = Vec::new();
+    // let url = "https://api.manifold.markets/v0/bets";
+    // loop {
+    //     let bets: Vec<Bet> = base_request(client.get(format!(
+    //         "{url}?contractId={}&limit=100&before={:?}",
+    //         market.id, &before
+    //     )))
+    //     .await
+    //     .unwrap();
+    //     if bets.len() == 100 {
+    //         full_bets.extend(bets);
+    //         before = Some(full_bets.last().unwrap().id.to_string());
+    //     } else {
+    //         full_bets.extend(bets);
+    //         break;
+    //     }
+    // }
+    // let extra_info: ExtraInfo = base_request(client.get(format!(
+    //     "https://api.manifold.markets/v0/market/{}",
+    //     market.id
+    // )))
+    // .await
+    // .unwrap();
+    // Ok(ManifoldMarket {
+
+    //     market: market.clone(),
+    //     bets: full_bets.clone(),
+    //     ticks: get_ticks(full_bets.clone()).unwrap(),
+    //     extraInfo: extra_info,
+    // })
 }
 fn is_valid(market: ManifoldMarket) -> bool {
     market.isResolved
