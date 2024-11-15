@@ -4,6 +4,8 @@ use super::*;
 use core::fmt;
 use serde::{de, Deserializer};
 use serde::{Deserialize, Serialize};
+use serde_json::from_str;
+
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -71,17 +73,34 @@ impl ManifoldMarket {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Serialize)]
 pub struct Bet {
     pub id: String,
-    userId: String,
+    pub userId: String,
     #[serde(with = "ts_milliseconds")]
-    createdTime: DateTime<Utc>,
-    probAfter: f32,
-    probBefore: f32,
-    shares: f32,
-    outcome: String,
-    amount: u32,
+    pub createdTime: DateTime<Utc>,
+    pub probAfter: f32,
+    pub probBefore: f32,
+    pub shares: f32,
+    pub outcome: String,
+    pub amount: u32,
+}
+
+pub type ProfitMap = HashMap<String, Option<i64>>;
+pub type VolumeMap = HashMap<String, i64>;
+
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
+pub struct User {
+    pub id: String,
+    pub createdTime: u64,
+    pub username: String,
+    pub name: String,
+    pub url: String,
+    pub cashBalance: f64,
+    pub balance: f64,
+    pub currentBettingStreak: Option<i32>,
+
+    pub totalDeposits: Option<f64>,
 }
 
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
@@ -259,10 +278,41 @@ impl MarketStandarizer for ManifoldMarket {
 
 pub async fn get_bets(market_id: Option<&str>, market_slug: Option<&str>) -> Vec<Bet> {
     let url = format!(
-        "https://api.manifoldfinance.com/markets/{}/bets",
+        "https://api.manifold.markets/v0/markets/{}/bets",
         market_id.unwrap_or(""),
     );
     let res = reqwest::get(&url).await;
     let bets: Vec<Bet> = res.unwrap().json().await.unwrap();
     bets
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq)]
+struct UserResponse {
+    #[serde(deserialize_with = "unwrap_user")]
+    users: Vec<User>,
+}
+
+fn unwrap_user<'de, D>(deserializer: D) -> std::result::Result<Vec<User>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let users: Vec<User> = Deserialize::deserialize(deserializer)?;
+    Ok(users)
+}
+
+pub async fn get_all_users(//limit: u32
+) -> Result<Vec<User>> {
+    let url = format!("https://api.manifold.markets/v0/users");
+    //?limit={}", limit);
+    let client = reqwest::Client::new();
+    let res = client.get(&url).send().await.unwrap();
+    let res_text = &res.text().await.unwrap();
+    // tracing::debug!("{:?}", res_text);
+    // let res_text = &res.text().await.unwrap();
+    let user_response: Vec<User> = serde_json::from_str(res_text).unwrap();
+    //tracing::debug!("{:?}", user_response);
+    // Ok(user_response.users)
+    // tracing::debug!()
+    // let users: Vec<User> = res.json().await.unwrap();
+    Ok(user_response)
 }

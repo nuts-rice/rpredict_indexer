@@ -2,6 +2,7 @@ use crate::admin::listener::MarketUpdateRcv;
 use crate::api::{self, *};
 use crate::context::Context;
 use crate::manifold::ManifoldMarket;
+use crate::model::manifold::User;
 use crate::polymarket::PolymarketEvent;
 use crate::{admin, types::*};
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
@@ -898,14 +899,18 @@ async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
     }
 }
 
-// async fn call_fn(name: &str, args: &str) -> Result<serde_json::Value> {
-
-// }
-
-// async fn lookup_market(question: &str, ) -> serde_json::Value {
-//     let questions = api::polymarket::PolymarketPlatform::builder().build().
-
-// }
+async fn info_per_trader() {
+    let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
+    let mut users = crate::model::manifold::get_all_users()
+        //1000)
+        .await
+        .unwrap();
+    // let mut users: Vec<User> = crate::model::manifold::get_all_users(3000).await;
+    let top_users_by_profit =
+        users.sort_by(|a, b| b.cashBalance.partial_cmp(&a.cashBalance).unwrap());
+    let top = users.iter().take(10).collect::<Vec<&User>>();
+    tracing::debug!("Top 10 users by profit: {:?}", top);
+}
 
 fn parse_polymarket_event(event: PolymarketEvent) -> Result<serde_json::Value> {
     let id = event.id.to_string();
@@ -938,6 +943,8 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
     let market_summarized = serde_json::json!({
         "question": market.question,
         "probability": probability,
+        "bets": market.bets,
+        "pool": market.pool,
     //    "pool": pool,
     });
     Ok(market_summarized)
@@ -1137,6 +1144,19 @@ mod tests {
             .unwrap();
         tracing::debug!("Result: {:?}", result);
     }
+
+    #[tokio::test]
+    async fn test_info_per_trader() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        info_per_trader().await;
+    }
+
     #[tokio::test]
     async fn test_stalker_pipeline() {
         tracing_subscriber::registry()

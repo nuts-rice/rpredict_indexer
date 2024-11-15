@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alloy = { version = "0.6.4", features = ["full"] }
 ansi_term = { version = "0.12.1", features = ["derive_serde_style", "serde"] }
 anyhow = "1.0.92"
 async-graphql = "7.0.9"

@@ -1,6 +1,7 @@
 use super::Result;
 use super::{Platform, PlatformBuilder};
 use crate::polymarket::{PolymarketEvent, PolymarketMarket, PolymarketPosition};
+use crate::utils::auth;
 use async_trait::async_trait;
 use serde_json::json;
 //https://github.com/Polymarket/py-clob-client

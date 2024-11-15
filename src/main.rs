@@ -42,6 +42,7 @@ pub mod server;
 pub mod strategies;
 pub mod types;
 pub mod ui;
+pub mod utils;
 pub use db::*;
 
 const MANIFOLD_ENDPOINT: &str = "https://api.manifold.markets/v0/markets";

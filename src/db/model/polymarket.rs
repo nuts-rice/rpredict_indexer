@@ -1,14 +1,36 @@
 use super::*;
+use crate::utils::auth::{self, AmpCookie};
 use axum::Json;
 use core::fmt;
+use reqwest::Proxy;
 use serde::{de, Deserializer};
 use serde::{Deserialize, Serialize};
+const CLOB_URL: &str = "https://clob.polymarket.com/";
+const CLOB_WS_URL: &str = "wss://ws-subscriptions-clob.polymarket.com/ws/";
+const CLOB_TRADES_URL: &str = "https://clob.polymarket.com/data/trades";
+const CLOB_PRICE_HISTORY_URL: &str = "https://clob.polymarket.com/prices-history";
+const POLYMARKET_RATELIMIT: u32 = 50;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PolymarketResult {
     next_cursor: String,
     pub data: Vec<PolymarketMarket>,
     // tokens: Option<Vec<PolymarketToken>>,
+}
+
+pub struct PolymarketTimeSeries {
+    history: Vec<TimeseriesPoint>,
+}
+
+pub struct TimeseriesPoint {
+    t: u64,
+    p: f64,
+}
+
+impl PolymarketTimeSeries {
+    pub fn get_time_series(&self, market: u64, start: u64, end: u64) -> Vec<TimeseriesPoint> {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -34,7 +56,40 @@ pub struct PolymarketMarket {
     // events: Option<Vec<PolymarketEvent>>,
 }
 
-pub struct PolymarketPosition {}
+pub struct PolymarketUser {}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MakerOrder {
+    order_id: String,
+    maker_address: String,
+    owner: String,
+    matched_amount: String,
+    price: String,
+    asset_id: String,
+    outcome: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PolymarketTrade {
+    id: String,
+    taker_order_id: String,
+    maker_orders: Vec<MakerOrder>,
+    owner: String,
+    size: String,
+    side: String,
+    fee_rate_bps: String,
+    price: String,
+}
+
+pub struct PolymarketPosition {
+    position_id: String,
+    owner: String,
+    size: String,
+    price: String,
+    outcome: String,
+    asset_id: String,
+    status: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PolymarketToken {
@@ -70,13 +125,6 @@ pub struct PolymarketEvent {
     pub neg_risk: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct PricesHistoryPoint {
-    #[serde(with = "ts_seconds")]
-    timestamp: DateTime<Utc>,
-    price: f64,
-}
-
 fn deserialize_outcome_prices<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<[f64; 2]>, D::Error>
@@ -110,22 +158,12 @@ where
     }
 }
 
-// type PolymarketToken = HashMap<>
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// struct PolymarketToken {
-//     token_id: u64,
-//     outcome: String,
-//     price: f64,
-//     winner: bool,
-// }
-//
-// impl FromStr for PolymarketMarket {
-//     type Err = serde_json::Error;
-//     fn from_str(s: &str) -> Result<Self, Self::Err> {
-//         serde_json::from_str(s)
-//     }
-// }
+impl PolymarketTrade {
+    pub fn get_trade(&self, id: &str) -> Result<PolymarketTrade> {
+        let url = format!("{}/{}", CLOB_TRADES_URL, id);
+        unimplemented!()
+    }
+}
 
 pub fn parse_polymarket_text(text: &str) -> Json<Vec<PolymarketMarket>> {
     let markets = serde_json::from_str(text).unwrap();
@@ -160,6 +198,19 @@ impl From<Vec<serde_json::Value>> for PolymarketResult {
             data: markets,
         }
     }
+}
+
+pub async fn get_user(
+    amp_cookie: &mut AmpCookie,
+    polymarket_nonce: &str,
+    polymarket_session: &str,
+    proxy: Option<&Proxy>,
+) -> Result<PolymarketUser> {
+    unimplemented!()
+}
+
+pub async fn get_all_users(limit: u32) -> Result<Vec<PolymarketUser>> {
+    unimplemented!()
 }
 
 fn deserialize_into_string_array<'de, D>(
