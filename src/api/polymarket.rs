@@ -192,9 +192,26 @@ impl Platform for PolymarketPlatform {
     }
 }
 
+
+
+
+pub async fn fetch_events_by_tag(tag: &str) -> Result<Vec<PolymarketEvent>> {
+    let platform = PolymarketPlatform::from(PlatformBuilder::default());
+    let url = format!("https://gamma-api.polymarket.com/events?tag={}", tag);
+    let response = platform
+        .0
+        .client
+        .get(url)
+        .send()
+        .await?
+        .json::<Vec<PolymarketEvent>>()
+        .await?;
+    Ok(response)
+}
+
 mod tests {
     use super::*;
-
+    use tracing_subscriber::prelude::*;
     #[tokio::test]
     async fn test_polymarket_markets() {
         let platform = PolymarketPlatform::from(PlatformBuilder::default());
@@ -206,5 +223,24 @@ mod tests {
         let platform = PolymarketPlatform::from(PlatformBuilder::default());
         let events = platform.fetch_events(Some(5), 1).await.unwrap();
         println!("Events: {:?}", events);
+    }
+
+    #[tokio::test]
+    async fn test_polymarket_fetch_by_tag() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
+        let tags: Vec<String> = vec!["movies".to_string(), "music".to_string()];
+        let platform = PolymarketPlatform::from(PlatformBuilder::default());
+        for tag in tags.iter() {
+            let markets = fetch_events_by_tag(tag).await.unwrap();
+
+            tracing::debug!("Markets: {:?}", markets);
+        }
     }
 }

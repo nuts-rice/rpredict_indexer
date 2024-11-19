@@ -5,7 +5,7 @@ pub use tokio::sync::{broadcast, mpsc, watch};
 pub mod index;
 pub mod platform;
 pub mod questions;
-
+pub mod schema;
 use super::types::Indicators;
 
 // type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

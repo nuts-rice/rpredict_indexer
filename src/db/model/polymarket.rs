@@ -36,21 +36,25 @@ impl PolymarketTimeSeries {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PolymarketMarket {
-    pub active: bool,
+    pub active: Option<bool>,
+    pub market_slug: Option<String>,
+    pub min_incentive_size: Option<String>,
+    pub max_incentive_size: Option<String>,
+    pub seconds_delay: Option<i64>,
     pub question: Option<String>,
+    pub fpmm: Option<String>,
     #[serde(rename = "questionId")]
     pub question_id: Option<String>,
     // #[serde(deserialize_with = "deserialize_into_string_array")]
     // pub outcomes: [String; 2],
-    pub accepting_orders: Option<bool>,
-    #[serde(deserialize_with = "deserialize_outcome_prices")]
-    pub outcome_prices: Option<[f64; 2]>,
+    // #[serde(deserialize_with = "deserialize_outcome_prices")]
+    // pub outcomePrices: Option<[f64; 2]>,
     pub category: Option<String>,
     // is_50_50_outcome: bool,
     // #[serde(deserialize_with = "deserialize_into_string_array")]
     // pub clob_token_ids: [String; 2],
-    pub spread: f64,
-    pub order_price_min_tick_size: f64,
+    // pub spread: f64,
+    // pub order_price_min_tick_size: f64,
     pub tokens: Option<Vec<PolymarketToken>>,
     pub rewards: Option<PolymarketRewards>,
     // events: Option<Vec<PolymarketEvent>>,
