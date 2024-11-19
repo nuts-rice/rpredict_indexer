@@ -1,6 +1,5 @@
-use super::Result;
-use super::{Platform, PlatformBuilder};
 use crate::api::base_request;
+use crate::api::{Platform, PlatformBuilder, Result};
 use crate::db;
 use crate::manifold::{ExtraInfo, ManifoldEvent};
 use crate::model::manifold::ManifoldPosition;
@@ -163,7 +162,7 @@ impl Platform for ManifoldPlatform {
 }
 
 async fn probability_series(id: &str) -> Vec<(u64, f64)> {
-    use super::manifold::*;
+    use crate::api::manifold;
     let times: Vec<u64> = vec![];
     let probabilities: Vec<f64> = vec![];
     let platform = ManifoldPlatform::from(PlatformBuilder::default());

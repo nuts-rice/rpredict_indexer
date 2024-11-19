@@ -1,4 +1,5 @@
 use crate::admin::listener::MarketUpdateRcv;
+use crate::api::manifold::manifold_api::ManifoldPlatform;
 use crate::api::{self, *};
 use crate::context::Context;
 use crate::manifold::ManifoldMarket;
@@ -480,7 +481,7 @@ impl Executor for ManifoldExecutor {
         ctx: &mut Context,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
         let qdrant = Arc::new(RwLock::new(
             Qdrant::from_url("http://localhost:6334").build().unwrap(),
         ));
@@ -900,7 +901,7 @@ async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
 }
 
 async fn info_per_trader() {
-    let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
+    let platform = ManifoldPlatform::from(PlatformBuilder::default());
     let mut users = crate::model::manifold::get_all_users()
         //1000)
         .await

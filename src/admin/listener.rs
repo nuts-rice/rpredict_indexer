@@ -1,4 +1,4 @@
-use crate::api::manifold;
+use crate::api::manifold::manifold_api::ManifoldPlatform;
 use crate::context::Context;
 use crate::types::StrategyConfig;
 use crate::types::Tick;
@@ -16,7 +16,7 @@ pub async fn listen_for_requests(
     markets_list: Arc<RwLock<Vec<serde_json::Value>>>,
     cache: Db,
     market_update_rx: MarketUpdateRcv,
-    platform: manifold::ManifoldPlatform,
+    platform: ManifoldPlatform,
 ) -> Result<(), Box<dyn std::error::Error>> {
     unimplemented!()
 }

@@ -3,6 +3,7 @@ use crate::executor::executor::{
     Executor, ExecutorType, ManifoldExecutor, PolymarketExecutor, Promptor,
 };
 use crate::types::create_match;
+use api::manifold::manifold_api::ManifoldPlatform;
 use api::Platform;
 use async_graphql::*;
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
@@ -71,7 +72,7 @@ async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl Int
     let pagiation = pagiation.unwrap_or_default();
     let offset = pagiation.offset.unwrap_or(0);
     let limit = pagiation.limit.unwrap_or(10);
-    let manifold = api::manifold::ManifoldPlatform::builder()
+    let manifold = ManifoldPlatform::builder()
         .build()
         .fetch_questions()
         .await
