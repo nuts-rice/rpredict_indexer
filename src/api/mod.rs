@@ -61,7 +61,7 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
         amount: f64,
         nonce: &str,
         outcome: &str,
-        limit: Option<f64>
+        limit: Option<f64>,
     ) -> Result<()>;
     async fn fetch_ratelimited(
         request_count: usize,

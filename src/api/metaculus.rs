@@ -104,7 +104,7 @@ impl Platform for MetaculusPlatform {
         amount: f64,
         nonce: &str,
         outcome: &str,
-        limit: Option<f64>
+        limit: Option<f64>,
     ) -> Result<()> {
         unimplemented!()
     }

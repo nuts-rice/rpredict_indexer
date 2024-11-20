@@ -89,7 +89,7 @@ impl Platform for ManifoldPlatform {
         amount: f64,
         nonce: &str,
         outcome: &str,
-        limit: Option<f64>
+        limit: Option<f64>,
     ) -> Result<()> {
         let builder = &self.0;
         let url = "https://api.manifold.markets/v0/bet";
@@ -98,14 +98,14 @@ impl Platform for ManifoldPlatform {
             {
             "amount": amount,
             "contractId": contract_id,
-            "outcome": outcome
+            "outcome": outcome,
+            "dryRun": true,
             }
-            
+
         );
         let body = prepped_order.as_object_mut().unwrap();
         if limit.is_some() {
-                body.insert("limitProb".to_string(), serde_json::json!(limit.unwrap()));
-                        
+            body.insert("limitProb".to_string(), serde_json::json!(limit.unwrap()));
         }
         tracing::debug!("Prepped Order: {:?}", body.clone());
         //TMI: it took me a whole hour to figure this when Postman solved this in seconds
@@ -118,7 +118,6 @@ impl Platform for ManifoldPlatform {
             .post(url)
             .headers(headers)
             .json(&body)
-
             .send()
             .await?
             .error_for_status()?;
@@ -318,7 +317,9 @@ mod tests {
             .with(tracing_subscriber::fmt::layer())
             .init();
         let mut manifold = ManifoldPlatform::from(PlatformBuilder::new());
-        let bet = manifold.build_order("9Ccsjc0fmbIb9g50p7SB", 1., "", "YES", None).await;
+        let bet = manifold
+            .build_order("9Ccsjc0fmbIb9g50p7SB", 1., "", "YES", None)
+            .await;
         tracing::debug!("Bet: {:?}", bet);
         // let bets = manifold
         //     .fetch_orderbook("9Ccsjc0fmbIb9g50p7SB")

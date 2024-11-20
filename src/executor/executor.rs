@@ -1,11 +1,10 @@
 use crate::admin::listener::MarketUpdateRcv;
 use crate::api::manifold::manifold_api::ManifoldPlatform;
+use crate::api::manifold::utils::order::{prep_order, BetParams};
 use crate::api::{self, Platform, *};
 use crate::context::Context;
 use crate::manifold::ManifoldMarket;
 use crate::model::manifold::User;
-use crate::api::manifold::utils::order::{prep_order, BetParams};
-use warp::{http::StatusCode, Filter};        
 use crate::polymarket::PolymarketEvent;
 use crate::{admin, types::*};
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
@@ -31,6 +30,7 @@ use std::any::Any;
 use std::sync::{Arc, RwLock};
 use tokio::io::AsyncReadExt;
 use tokio_tungstenite::tungstenite::protocol::Message;
+use warp::{http::StatusCode, Filter};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -280,6 +280,12 @@ pub trait Executor: From<ExecutorBuilder<Self>> + Any {
     ) -> Result<()>;
     async fn aggregate_data(&self) -> Result<()>;
     async fn execute(&self, ctx: Context, rx: MarketUpdateRcv);
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()>;
     fn builder(
         max_tokens: u32,
         token_limit: u32,
@@ -460,6 +466,15 @@ impl Executor for PolymarketExecutor {
     async fn aggregate_data(&self) -> Result<()> {
         Ok(())
     }
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn execute(&self, ctx: Context, rx: MarketUpdateRcv) {
         println!("Polymarket Executor executing");
     }
@@ -657,6 +672,20 @@ impl Executor for ManifoldExecutor {
         }
         client.threads().delete(&thread.id).await?;
         client.assistants().delete(&assistant.id).await?;
+        Ok(())
+    }
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
+        let market = platform.fetch_question_by_id(contract_id).await?;
+        let news = lookup_news(market.question.as_str(), market.question.as_str()).await?;
+        tracing::debug!("News: {:?}", news);
+        let market_summarized = parse_manifold_market(market).unwrap();
+        tracing::debug!("Market: {:?}", market_summarized);
         Ok(())
     }
 
@@ -858,6 +887,14 @@ impl Executor for MetaculusExecutor {
         let questions = ctx.questions;
         println!("Metaculus Executor executing");
     }
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
@@ -902,21 +939,49 @@ async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
     }
 }
 
-async fn send_automated_order_dryrun(outcome: &str, platform: ManifoldPlatform, bet_params: BetParams) {
+async fn send_automated_order_dryrun(
+    outcome: &str,
+    platform: ManifoldPlatform,
+    bet_params: BetParams,
+) {
     // let bets_url = warp::path!("https://api.manifold.markets/v0/bets").and(warp::path::end()).and(warp::query::<BetParams>())
     //     .map(move |bet_params: BetParams| {
     //         let bet = platform.create_bet(bet_params);
     //     });
-    let response = platform.build_order(&bet_params.contract_id.unwrap(), bet_params.amount.unwrap(), "1", outcome, bet_params.limit).await;
-    tracing::debug!("Response: {:?}", response);
+    let response = platform
+        .build_order(
+            &bet_params.contract_id.unwrap(),
+            bet_params.amount.unwrap(),
+            "1",
+            outcome,
+            bet_params.limit,
+        )
+        .await;
 
-        
+    tracing::debug!("Response: {:?}", response);
 }
 
-
-async fn build_automated_order() {
+async fn build_automated_order(
+    question: &str,
+    outcome: &str,
+    tags: Option<Vec<String>>,
+    ctx: &mut Context,
+    user_id: String,
+    amount: f64,
+) {
     let platform = ManifoldPlatform::from(PlatformBuilder::default());
-} 
+
+    let executor =
+        ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
+    let mut context = Context::new();
+    let result = executor
+        .init(question, outcome, tags, &mut context)
+        .await
+        .unwrap();
+    tracing::debug!("Result: {:?}", result);
+    // let mut bet = BetParams{};
+    unimplemented!()
+}
 
 async fn info_per_trader() {
     let platform = ManifoldPlatform::from(PlatformBuilder::default());
@@ -947,7 +1012,7 @@ fn parse_polymarket_event(event: PolymarketEvent) -> Result<serde_json::Value> {
 
 fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
     let probability: String = if let Some(probability) = market.probability {
-        probability.to_string()
+        (probability * 100.0).to_string()
     } else {
         "".to_string()
     };
@@ -1179,15 +1244,17 @@ mod tests {
             limit: Some(0.5),
             contract_slug: None,
             username: None,
-
         };
         let outcome = "YES".to_string();
-        let dry_run = send_automated_order_dryrun(&outcome, ManifoldPlatform::from(PlatformBuilder::default()), bet_params).await;
-        
-        
-
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
+        let executor =
+            ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
+        let mut context = Context::new();
+        let result = executor
+            .fetch_result_by_id("9Ccsjc0fmbIb9g50p7SB", context, None)
+            .await
+            .unwrap();
     }
-
 
     #[tokio::test]
     async fn test_info_per_trader() {

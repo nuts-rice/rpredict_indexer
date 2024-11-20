@@ -9,7 +9,7 @@ pub enum Outcome {
     No,
     FreeResponse(String),
     Numeric(String, f64),
-    }
+}
 
 #[derive(Deserialize)]
 pub struct BetParams {
@@ -22,11 +22,9 @@ pub struct BetParams {
     pub contract_slug: Option<String>,
     pub limit: Option<f64>,
     pub amount: Option<f64>,
-    
+}
 
-} 
-
-pub async fn prep_order(platform: ManifoldPlatform,  )  {
-            // let builder = &platform
-unimplemented!()
+pub async fn prep_order(platform: ManifoldPlatform) {
+    // let builder = &platform
+    unimplemented!()
 }

@@ -96,7 +96,6 @@ impl Platform for GammaPlatform {
         nonce: &str,
         outcome: &str,
         limit: Option<f64>,
-            
     ) -> Result<()> {
         unimplemented!()
     }
