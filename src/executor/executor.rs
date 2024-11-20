@@ -1,9 +1,11 @@
 use crate::admin::listener::MarketUpdateRcv;
 use crate::api::manifold::manifold_api::ManifoldPlatform;
-use crate::api::{self, *};
+use crate::api::{self, Platform, *};
 use crate::context::Context;
 use crate::manifold::ManifoldMarket;
 use crate::model::manifold::User;
+use crate::api::manifold::utils::order::{prep_order, BetParams};
+use warp::{http::StatusCode, Filter};        
 use crate::polymarket::PolymarketEvent;
 use crate::{admin, types::*};
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
@@ -900,6 +902,22 @@ async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
     }
 }
 
+async fn send_automated_order_dryrun(outcome: &str, platform: ManifoldPlatform, bet_params: BetParams) {
+    // let bets_url = warp::path!("https://api.manifold.markets/v0/bets").and(warp::path::end()).and(warp::query::<BetParams>())
+    //     .map(move |bet_params: BetParams| {
+    //         let bet = platform.create_bet(bet_params);
+    //     });
+    let response = platform.build_order(&bet_params.contract_id.unwrap(), bet_params.amount.unwrap(), "1", outcome, bet_params.limit).await;
+    tracing::debug!("Response: {:?}", response);
+
+        
+}
+
+
+async fn build_automated_order() {
+    let platform = ManifoldPlatform::from(PlatformBuilder::default());
+} 
+
 async fn info_per_trader() {
     let platform = ManifoldPlatform::from(PlatformBuilder::default());
     let mut users = crate::model::manifold::get_all_users()
@@ -1145,6 +1163,31 @@ mod tests {
             .unwrap();
         tracing::debug!("Result: {:?}", result);
     }
+    #[tokio::test]
+    async fn test_bet_dryrun() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        let bet_params = BetParams {
+            user_id: Some("v0KTj3BgbAMSp1XOpjcRYdliJbb2".to_string()),
+            amount: Some(100.),
+            contract_id: Some("6FQW9DSCHLCXAfpDHRZC".to_string()),
+            limit: Some(0.5),
+            contract_slug: None,
+            username: None,
+
+        };
+        let outcome = "YES".to_string();
+        let dry_run = send_automated_order_dryrun(&outcome, ManifoldPlatform::from(PlatformBuilder::default()), bet_params).await;
+        
+        
+
+    }
+
 
     #[tokio::test]
     async fn test_info_per_trader() {

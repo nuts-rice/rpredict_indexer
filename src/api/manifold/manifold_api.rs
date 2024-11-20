@@ -89,25 +89,39 @@ impl Platform for ManifoldPlatform {
         amount: f64,
         nonce: &str,
         outcome: &str,
+        limit: Option<f64>
     ) -> Result<()> {
         let builder = &self.0;
-        let url = format!("https://api.manifold.markets/v0/bet",);
+        let url = "https://api.manifold.markets/v0/bet";
         let key: String = std::env::var("MANIFOLD_API_KEY").unwrap();
-        let prepped_order = serde_json::json!(
+        let mut prepped_order = serde_json::json!(
             {
-            "contractId": contract_id,
             "amount": amount,
+            "contractId": contract_id,
             "outcome": outcome
             }
+            
         );
-
+        let body = prepped_order.as_object_mut().unwrap();
+        if limit.is_some() {
+                body.insert("limitProb".to_string(), serde_json::json!(limit.unwrap()));
+                        
+        }
+        tracing::debug!("Prepped Order: {:?}", body.clone());
+        //TMI: it took me a whole hour to figure this when Postman solved this in seconds
+        let mut headers = reqwest::header::HeaderMap::new();
+        let auth_header = format!("Key {}", key);
+        headers.insert("Content-Type", "application/json".parse()?);
+        headers.insert("Authorization", auth_header.parse()?);
         let response = builder
             .client
             .post(url)
-            .header("Authorization: Key {}", key)
-            .json(&prepped_order)
+            .headers(headers)
+            .json(&body)
+
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
         tracing::debug!("Bet: {:?}", response);
         Ok(())
     }
@@ -304,7 +318,8 @@ mod tests {
             .with(tracing_subscriber::fmt::layer())
             .init();
         let mut manifold = ManifoldPlatform::from(PlatformBuilder::new());
-        let bet = manifold.build_order("9Ccsjc0fmbIb9g50p7SB", 10., "", "YES");
+        let bet = manifold.build_order("9Ccsjc0fmbIb9g50p7SB", 1., "", "YES", None).await;
+        tracing::debug!("Bet: {:?}", bet);
         // let bets = manifold
         //     .fetch_orderbook("9Ccsjc0fmbIb9g50p7SB")
         //     .await

@@ -97,6 +97,7 @@ impl Platform for PolymarketPlatform {
         amount: f64,
         nonce: &str,
         outcome: &str,
+        limit: Option<f64>,
     ) -> Result<()> {
         unimplemented!()
     }
