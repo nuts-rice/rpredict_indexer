@@ -3,10 +3,11 @@ use crate::api::manifold::manifold_api::ManifoldPlatform;
 use crate::api::manifold::utils::order::{prep_order, BetParams};
 use crate::api::{self, Platform, *};
 use crate::context::Context;
-use crate::manifold::ManifoldMarket;
+use crate::manifold::{ManifoldMarket, MarketOutcome};
 use crate::model::manifold::User;
 use crate::polymarket::PolymarketEvent;
 use crate::{admin, types::*};
+use anthropic_sdk::*;
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
 use async_openai::types::{CreateMessageRequestArgs, CreateRunRequestArgs};
 use async_openai::{
@@ -164,6 +165,28 @@ impl Promptor {
         Give your response in the following format:
 
         I believe {} has a likelihood (float)% for outcome of {}.", market_data, event_data, market_question, outcome) + self.filter_markets().as_str() + self.filter_events().as_str();
+
+        prompt
+    }
+
+    pub fn prompts_manifold_filter_order(
+        &self,
+        market_data: serde_json::Value,
+        event_data: Vec<&String>,
+        market_question: &str,
+        outcomes: Vec<&MarketOutcome>,
+    ) -> String {
+        let prompt = format!("You are an AI assistant for users of a prediction market called Manifold.
+        Users want to place bets based on their beliefs of market outcomes such as political or sports events.
+        
+        Here is data for a current Manifold market {:?} and 
+        current events related to the market {:?}.
+
+        Help users identify a reasonable order to place based on the above.
+        Provide specific information for the market including probabilities of outcomes.
+        Give your response in the following format:
+
+        I believe out of all possible outcomes {:?} for the question {}, (outcome) is the most likely", market_data, event_data, outcomes, market_question) + self.filter_markets().as_str() + self.filter_events().as_str();
 
         prompt
     }
@@ -526,7 +549,7 @@ impl Executor for ManifoldExecutor {
                 let market_data = platform.fetch_markets_by_terms(&tag).await?;
                 let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
                 market_data.iter().for_each(|m| {
-                    let market_summarized = parse_manifold_market(m.clone()).unwrap();
+                    let market_summarized = parse_manifold_market(&m).unwrap();
 
                     markets.push(market_summarized.into());
                 })
@@ -680,12 +703,25 @@ impl Executor for ManifoldExecutor {
         ctx: Context,
         tags: Option<Vec<String>>,
     ) -> Result<()> {
+        let builder = &self.0;
+
         let platform = ManifoldPlatform::from(PlatformBuilder::default());
         let market = platform.fetch_question_by_id(contract_id).await?;
         let news = lookup_news(market.question.as_str(), market.question.as_str()).await?;
+        let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("News: {:?}", news);
-        let market_summarized = parse_manifold_market(market).unwrap();
+        let market_summarized = parse_manifold_market(&market).unwrap();
         tracing::debug!("Market: {:?}", market_summarized);
+        let client = anthropic_sdk::Client::new()
+            .model("claude-3-opus-20240229")
+            .messages(&json!([builder.promptor.prompts_manifold_filter_order(
+                market_summarized,
+                trimmed_news,
+                market.question.clone().as_str(),
+                market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>()
+            )]))
+            .build()?;
+
         Ok(())
     }
 
@@ -1010,12 +1046,21 @@ fn parse_polymarket_event(event: PolymarketEvent) -> Result<serde_json::Value> {
     Ok(event_summarized)
 }
 
-fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
+fn parse_manifold_market(market: &ManifoldMarket) -> Result<serde_json::Value> {
     let probability: String = if let Some(probability) = market.probability {
         (probability * 100.0).to_string()
     } else {
         "".to_string()
     };
+    // let outcomePrices = if let Some(pool) = &market.pool {
+    //     let mut outcomes = Vec::new();
+    //     for (key, value) in pool.iter() {
+    //         outcomes.push(format!("{}: {}", key, value.to_string()));
+    //     }
+    //     outcomes
+    //         } else {
+    //     vec!["0".to_string(), "0".to_string()]
+    // };
     // let pool: [String; 2] = if let Some(pool) = market.pool {
     //     [
     //         format!("Yes: {}", pool.YES.to_string()),
@@ -1029,6 +1074,7 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
         "probability": probability,
         "bets": market.bets,
         "pool": market.pool,
+        // "outcomes": market.outcomePrices
     //    "pool": pool,
     });
     Ok(market_summarized)
