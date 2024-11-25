@@ -108,7 +108,7 @@ impl Platform for MetaculusPlatform {
         unimplemented!()
     }
 
-    async fn get_user_id(&self, ) -> Result<String> {
+    async fn get_user_id(&self) -> Result<String> {
         unimplemented!()
     }
 
@@ -148,10 +148,12 @@ impl Platform for MetaculusPlatform {
     }
 }
 
-
-async fn post_forecast(question_id: u32, probability_yes: f64, probability_yes_per_catagory: Option<Vec<f64>>) -> Result<()> {
-    let client = reqwest::Client::builder()
-        .build()?;
+async fn post_forecast(
+    question_id: u32,
+    probability_yes: f64,
+    probability_yes_per_catagory: Option<Vec<f64>>,
+) -> Result<()> {
+    let client = reqwest::Client::builder().build()?;
     let url = format!("https://www.metaculus.com/api/questions/forecast");
     let token: String = std::env::var("METACULUS_API_KEY").unwrap();
     let mut headers = reqwest::header::HeaderMap::new();
@@ -160,7 +162,7 @@ async fn post_forecast(question_id: u32, probability_yes: f64, probability_yes_p
     // headers.insert("Content-Type", "application/json".parse()?);
 
     let mut prepped_body = serde_json::json!({
-        "question": question_id,               
+        "question": question_id,
         "prediction": probability_yes
     });
     let body = prepped_body.as_object_mut().unwrap();
@@ -174,7 +176,6 @@ async fn post_forecast(question_id: u32, probability_yes: f64, probability_yes_p
         .error_for_status()?;
     tracing::debug!("Response: {:?}", request);
     Ok(())
-
 }
 
 #[cfg(test)]
@@ -208,5 +209,4 @@ mod tests {
             .init();
         post_forecast(489, 0.6, None).await.unwrap();
     }
-
 }

@@ -84,7 +84,6 @@ impl Platform for ManifoldPlatform {
         Ok(response)
     }
 
-
     async fn get_user_id(&self) -> Result<String> {
         unimplemented!()
     }

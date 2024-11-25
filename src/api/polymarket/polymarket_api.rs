@@ -1,5 +1,5 @@
-use super::Result;
-use super::{Platform, PlatformBuilder};
+use crate::api::Result;
+use crate::api::{Platform, PlatformBuilder};
 use crate::polymarket::{PolymarketEvent, PolymarketMarket, PolymarketPosition};
 use crate::utils::auth;
 use async_trait::async_trait;

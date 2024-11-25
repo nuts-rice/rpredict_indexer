@@ -4,6 +4,7 @@ use crate::executor::executor::{
 };
 use crate::types::create_match;
 use api::manifold::manifold_api::ManifoldPlatform;
+use api::polymarket::{polymarket_api, utils};
 use api::Platform;
 use async_graphql::*;
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
@@ -13,6 +14,7 @@ use axum::{
     routing::get,
     Router,
 };
+
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     crossterm::{
@@ -43,7 +45,6 @@ pub mod server;
 pub mod strategies;
 pub mod types;
 pub mod ui;
-pub mod utils;
 pub use db::*;
 
 const MANIFOLD_ENDPOINT: &str = "https://api.manifold.markets/v0/markets";
@@ -126,7 +127,7 @@ async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usiz
 
 async fn polymarket_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
     let pagiation = pagiation.unwrap_or_default();
-    let questions = api::polymarket::PolymarketPlatform::builder()
+    let questions = polymarket_api::PolymarketPlatform::builder()
         .build()
         .fetch_json()
         .await

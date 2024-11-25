@@ -127,6 +127,32 @@ impl Promptor {
         prompt
     }
 
+    pub fn prompts_polymarket_filter_order(
+        &self,
+        market_data: serde_json::Value,
+        event_data: Vec<&String>,
+        market_question: &str,
+        outcomes: Vec<&MarketOutcome>,
+    ) -> String {
+        let prompt = format!("You are an AI assistant for users of a prediction market called Polymarket.
+        Users want to place bets based on their beliefs of market outcomes such as political or sports events.
+        
+        Here is data for a current Polymarket market {:?} and 
+        current events related to the market {:?}.
+
+        Help users identify a reasonable order to place based on the above.
+        Provide specific information for the market including probabilities of outcomes.
+        Give your response in the following JSON format:                
+        {{ 
+        Question: {} ,
+        Possible_outcomes: {:?},
+        Most_likely_outcome: (outcomes),
+        Probability_of_most_likely_outcome: 
+        }}", market_data, event_data, market_question, outcomes);
+
+        prompt
+    }
+
     pub fn prompts_manifold(
         &self,
         market_data: Vec<serde_json::Value>,
@@ -167,11 +193,9 @@ impl Promptor {
         Question: {} ,
         Most_likely_outcome: {},
         Probability_of_most_likely_outcome: 
-        }}", market_data, event_data, market_question, outcome); 
+        }}", market_data, event_data, market_question, outcome);
 
         prompt
-
-
     }
 
     pub fn prompts_manifold_filter_order(
@@ -195,8 +219,7 @@ impl Promptor {
         Possible_outcomes: {:?},
         Most_likely_outcome: (outcomes),
         Probability_of_most_likely_outcome: 
-        }}", market_data, event_data, market_question, outcomes); 
-
+        }}", market_data, event_data, market_question, outcomes);
 
         prompt
     }
@@ -355,7 +378,8 @@ impl Executor for PolymarketExecutor {
         //<'a>,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::polymarket::PolymarketPlatform::from(PlatformBuilder::default());
+        let platform =
+            api::polymarket::polymarket_api::PolymarketPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await?;
         //todo: Pare down news to only the relevant information
         let trimmed_news = news.iter().take(8).collect::<Vec<&String>>();
@@ -729,14 +753,11 @@ impl Executor for ManifoldExecutor {
             market_summarized,
             trimmed_news,
             market.question.clone().as_str(),
-            market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>()
-
+            market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>(),
         );
 
         let assistant_request = CreateAssistantRequestArgs::default()
-            .instructions(
-                prompt.clone()
-            )
+            .instructions(prompt.clone())
             .model("gpt-4o")
             .build()?;
         let assistant = client.assistants().create(assistant_request).await?;
@@ -820,7 +841,7 @@ impl Executor for ManifoldExecutor {
         }
         client.threads().delete(&thread.id).await?;
         client.assistants().delete(&assistant.id).await?;
-        
+
         // let request = anthropic_sdk::Client::new()
         //     .auth(&secret)
         //     .model("claude-3-opus-20240229")
@@ -832,7 +853,6 @@ impl Executor for ManifoldExecutor {
         //     )]))
         //     .stream(true)
         //     .build()?;
-        
 
         Ok(())
     }
@@ -872,7 +892,8 @@ impl Executor for MetaculusExecutor {
         ctx: &mut Context,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::metaculus::metaculus_api::MetaculusPlatform::from(PlatformBuilder::default());
+        let platform =
+            api::metaculus::metaculus_api::MetaculusPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await.unwrap();
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("Trimmed News: {:?}", trimmed_news);
@@ -1046,8 +1067,8 @@ impl Executor for MetaculusExecutor {
 }
 
 async fn parse_trade_prompt(best_trade: &str) -> f64 {
-        let trade_data = best_trade.split(",");
-        unimplemented!()
+    let trade_data = best_trade.split(",");
+    unimplemented!()
 }
 
 async fn best_trade(market: ManifoldMarket) -> String {

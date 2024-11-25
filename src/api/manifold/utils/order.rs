@@ -1,4 +1,8 @@
-use crate::{api::{manifold::manifold_api::ManifoldPlatform, PlatformBuilder}, manifold::ManifoldMarket, manifold::MarketOutcome};
+use crate::{
+    api::{manifold::manifold_api::ManifoldPlatform, PlatformBuilder},
+    manifold::ManifoldMarket,
+    manifold::MarketOutcome,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -24,10 +28,14 @@ pub struct BetParams {
     pub amount: Option<f64>,
 }
 
-pub async fn prep_order(platform: ManifoldPlatform, prompt_result: &str, market: ManifoldMarket, amount: f64, limit: f64  ) -> BetParams {
+pub async fn prep_order(
+    platform: ManifoldPlatform,
+    prompt_result: &str,
+    market: ManifoldMarket,
+    amount: f64,
+    limit: f64,
+) -> BetParams {
     let market_outcomes = market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>();
     let prompt_outcomes = "";
-        unimplemented!()
-
-
+    unimplemented!()
 }

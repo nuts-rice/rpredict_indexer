@@ -1,5 +1,6 @@
 use super::*;
 use crate::utils::auth::{self, AmpCookie};
+//use alloy::sol_types::sol_data::String;
 use axum::Json;
 use core::fmt;
 use reqwest::Proxy;
@@ -11,7 +12,7 @@ const CLOB_TRADES_URL: &str = "https://clob.polymarket.com/data/trades";
 const CLOB_PRICE_HISTORY_URL: &str = "https://clob.polymarket.com/prices-history";
 const POLYMARKET_RATELIMIT: u32 = 50;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct PolymarketResult {
     next_cursor: String,
     pub data: Vec<PolymarketMarket>,
@@ -54,6 +55,26 @@ pub struct PolymarketMarket {
     pub tokens: Option<Vec<PolymarketToken>>,
     pub rewards: Option<PolymarketRewards>,
     // events: Option<Vec<PolymarketEvent>>,
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Hash, Eq, Serialize)]
+pub enum PolymarketOutcome {
+    #[serde(rename = "YES")]
+    Yes,
+    #[serde(rename = "NO")]
+    No,
+    #[serde(untagged)]
+    Other(String),
+}
+
+impl std::fmt::Display for PolymarketOutcome {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PolymarketOutcome::Yes => write!(f, "YES"),
+            PolymarketOutcome::No => write!(f, "NO"),
+            PolymarketOutcome::Other(s) => write!(f, "{}", s),
+        }
+    }
 }
 
 pub struct PolymarketUser {}

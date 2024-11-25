@@ -89,7 +89,7 @@ impl Platform for GammaPlatform {
         Ok(response)
     }
 
-    async fn get_user_id(&self, ) -> Result<String> {
+    async fn get_user_id(&self) -> Result<String> {
         unimplemented!()
     }
 
