@@ -1,4 +1,4 @@
-use crate::api::manifold::ManifoldPlatform;
+use crate::api::manifold::manifold_api::ManifoldPlatform;
 use crate::api::{Platform, PlatformBuilder};
 use crate::db::model::manifold::ManifoldMarket;
 use crate::manifold::ManifoldPosition;

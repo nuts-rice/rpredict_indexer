@@ -1,5 +1,5 @@
 use crate::{
-    api::{self, *},
+    api::{self, manifold::manifold_api::ManifoldPlatform, PlatformBuilder},
     manifold::ManifoldMarket,
     types::StrategyConfig,
 };
@@ -59,7 +59,7 @@ pub struct Context
 {
     pub id: String,
     pub strategy_config: Arc<RwLock<StrategyConfig>>,
-    pub manifold: Arc<RwLock<api::manifold::ManifoldPlatform>>,
+    pub manifold: Arc<RwLock<ManifoldPlatform>>,
     //pub questions: //Arc<RwLock<Vec<serde_json::Value>>>,
     pub questions: Vec<serde_json::Value>,
     //TODO: cross platforms
@@ -72,7 +72,7 @@ impl Context
 //<'a>
 {
     pub fn new() -> Self {
-        let manifold = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
+        let manifold = ManifoldPlatform::from(PlatformBuilder::default());
         let strategy_config = StrategyConfig::default();
         let selecteable_markets =
             StatefulList::with_items(vec!["Market 1", "Market 2", "Market 3"]);

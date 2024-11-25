@@ -1,10 +1,13 @@
 use crate::admin::listener::MarketUpdateRcv;
-use crate::api::{self, *};
+use crate::api::manifold::manifold_api::ManifoldPlatform;
+use crate::api::manifold::utils::order::{prep_order, BetParams};
+use crate::api::{self, Platform, *};
 use crate::context::Context;
-use crate::manifold::ManifoldMarket;
+use crate::manifold::{ManifoldMarket, MarketOutcome};
 use crate::model::manifold::User;
 use crate::polymarket::PolymarketEvent;
 use crate::{admin, types::*};
+use anthropic_sdk::*;
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
 use async_openai::types::{CreateMessageRequestArgs, CreateRunRequestArgs};
 use async_openai::{
@@ -28,6 +31,7 @@ use std::any::Any;
 use std::sync::{Arc, RwLock};
 use tokio::io::AsyncReadExt;
 use tokio_tungstenite::tungstenite::protocol::Message;
+use warp::{http::StatusCode, Filter};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -123,6 +127,32 @@ impl Promptor {
         prompt
     }
 
+    pub fn prompts_polymarket_filter_order(
+        &self,
+        market_data: serde_json::Value,
+        event_data: Vec<&String>,
+        market_question: &str,
+        outcomes: Vec<&MarketOutcome>,
+    ) -> String {
+        let prompt = format!("You are an AI assistant for users of a prediction market called Polymarket.
+        Users want to place bets based on their beliefs of market outcomes such as political or sports events.
+        
+        Here is data for a current Polymarket market {:?} and 
+        current events related to the market {:?}.
+
+        Help users identify a reasonable order to place based on the above.
+        Provide specific information for the market including probabilities of outcomes.
+        Give your response in the following JSON format:                
+        {{ 
+        Question: {} ,
+        Possible_outcomes: {:?},
+        Most_likely_outcome: (outcomes),
+        Probability_of_most_likely_outcome: 
+        }}", market_data, event_data, market_question, outcomes);
+
+        prompt
+    }
+
     pub fn prompts_manifold(
         &self,
         market_data: Vec<serde_json::Value>,
@@ -158,9 +188,38 @@ impl Promptor {
 
         Help users identify markets to trade based on their interests or queries.
         Provide specific information for markets including probabilities of outcomes.
-        Give your response in the following format:
+        Give your response in the following JSON format:
+        {{ 
+        Question: {} ,
+        Most_likely_outcome: {},
+        Probability_of_most_likely_outcome: 
+        }}", market_data, event_data, market_question, outcome);
 
-        I believe {} has a likelihood (float)% for outcome of {}.", market_data, event_data, market_question, outcome) + self.filter_markets().as_str() + self.filter_events().as_str();
+        prompt
+    }
+
+    pub fn prompts_manifold_filter_order(
+        &self,
+        market_data: serde_json::Value,
+        event_data: Vec<&String>,
+        market_question: &str,
+        outcomes: Vec<&MarketOutcome>,
+    ) -> String {
+        let prompt = format!("You are an AI assistant for users of a prediction market called Manifold.
+        Users want to place bets based on their beliefs of market outcomes such as political or sports events.
+        
+        Here is data for a current Manifold market {:?} and 
+        current events related to the market {:?}.
+
+        Help users identify a reasonable order to place based on the above.
+        Provide specific information for the market including probabilities of outcomes.
+        Give your response in the following JSON format:                
+        {{ 
+        Question: {} ,
+        Possible_outcomes: {:?},
+        Most_likely_outcome: (outcomes),
+        Probability_of_most_likely_outcome: 
+        }}", market_data, event_data, market_question, outcomes);
 
         prompt
     }
@@ -277,6 +336,12 @@ pub trait Executor: From<ExecutorBuilder<Self>> + Any {
     ) -> Result<()>;
     async fn aggregate_data(&self) -> Result<()>;
     async fn execute(&self, ctx: Context, rx: MarketUpdateRcv);
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()>;
     fn builder(
         max_tokens: u32,
         token_limit: u32,
@@ -313,7 +378,8 @@ impl Executor for PolymarketExecutor {
         //<'a>,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::polymarket::PolymarketPlatform::from(PlatformBuilder::default());
+        let platform =
+            api::polymarket::polymarket_api::PolymarketPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await?;
         //todo: Pare down news to only the relevant information
         let trimmed_news = news.iter().take(8).collect::<Vec<&String>>();
@@ -457,6 +523,15 @@ impl Executor for PolymarketExecutor {
     async fn aggregate_data(&self) -> Result<()> {
         Ok(())
     }
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn execute(&self, ctx: Context, rx: MarketUpdateRcv) {
         println!("Polymarket Executor executing");
     }
@@ -480,7 +555,7 @@ impl Executor for ManifoldExecutor {
         ctx: &mut Context,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
         let qdrant = Arc::new(RwLock::new(
             Qdrant::from_url("http://localhost:6334").build().unwrap(),
         ));
@@ -508,7 +583,7 @@ impl Executor for ManifoldExecutor {
                 let market_data = platform.fetch_markets_by_terms(&tag).await?;
                 let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
                 market_data.iter().for_each(|m| {
-                    let market_summarized = parse_manifold_market(m.clone()).unwrap();
+                    let market_summarized = parse_manifold_market(&m).unwrap();
 
                     markets.push(market_summarized.into());
                 })
@@ -656,6 +731,131 @@ impl Executor for ManifoldExecutor {
         client.assistants().delete(&assistant.id).await?;
         Ok(())
     }
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        let builder = &self.0;
+
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
+        let market = platform.fetch_question_by_id(contract_id).await?;
+        let news = lookup_news(market.question.as_str(), market.question.as_str()).await?;
+        let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
+        tracing::debug!("News: {:?}", news);
+        let market_summarized = parse_manifold_market(&market).unwrap();
+        let query = [("limit", "1")];
+        tracing::debug!("Market: {:?}", market_summarized);
+        // let secret = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY must be set");
+        let client = async_openai::Client::new();
+        let prompt = builder.promptor.prompts_manifold_filter_order(
+            market_summarized,
+            trimmed_news,
+            market.question.clone().as_str(),
+            market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>(),
+        );
+
+        let assistant_request = CreateAssistantRequestArgs::default()
+            .instructions(prompt.clone())
+            .model("gpt-4o")
+            .build()?;
+        let assistant = client.assistants().create(assistant_request).await?;
+        let assistant_id = assistant.id.clone();
+        let thread = client
+            .threads()
+            .create(CreateThreadRequest::default())
+            .await?;
+        let message = CreateMessageRequestArgs::default()
+            .role(MessageRole::User)
+            .content(prompt.clone())
+            .build()?;
+        let _message = client
+            .threads()
+            .messages(&thread.id)
+            .create(message)
+            .await?;
+        let run_request = CreateRunRequestArgs::default()
+            .assistant_id(assistant_id)
+            .build()?;
+        let mut run = client
+            .threads()
+            .runs(&thread.id)
+            .create(run_request)
+            .await?;
+        loop {
+            match run.status {
+                RunStatus::Completed => {
+                    let messages = client.threads().messages(&thread.id).list(&query).await?;
+                    for message_obj in messages.data {
+                        let message_contents = message_obj.content;
+                        for message_content in message_contents {
+                            match message_content {
+                                MessageContent::Text(text) => {
+                                    let text_data = text.text;
+                                    let annotations = text_data.annotations;
+                                    println!("{}", text_data.value);
+                                    println!("{annotations:?}");
+                                }
+                                MessageContent::ImageFile(_) | MessageContent::ImageUrl(_) => {
+                                    eprintln!("Images not supported on terminal");
+                                }
+                                MessageContent::Refusal(refusal) => {
+                                    println!("{refusal:?}");
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                RunStatus::Failed => {
+                    println!("> Run Failed: {:#?}", run);
+                    break;
+                }
+                RunStatus::Queued => {
+                    println!("> Run Queued");
+                }
+                RunStatus::Cancelling => {
+                    println!("> Run Cancelling");
+                }
+                RunStatus::Cancelled => {
+                    println!("> Run Cancelled");
+                    break;
+                }
+                RunStatus::Expired => {
+                    println!("> Run Expired");
+                    break;
+                }
+                RunStatus::RequiresAction => {
+                    println!("> Run Requires Action");
+                }
+                RunStatus::InProgress => {
+                    println!("> In Progress ...");
+                }
+                RunStatus::Incomplete => {
+                    println!("> Run Incomplete");
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            run = client.threads().runs(&thread.id).retrieve(&run.id).await?;
+        }
+        client.threads().delete(&thread.id).await?;
+        client.assistants().delete(&assistant.id).await?;
+
+        // let request = anthropic_sdk::Client::new()
+        //     .auth(&secret)
+        //     .model("claude-3-opus-20240229")
+        //     .messages(&json!([builder.promptor.prompts_manifold_filter_order(
+        //         market_summarized,
+        //         trimmed_news,
+        //         market.question.clone().as_str(),
+        //         market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>()
+        //     )]))
+        //     .stream(true)
+        //     .build()?;
+
+        Ok(())
+    }
 
     async fn aggregate_data(&self) -> Result<()> {
         Ok(())
@@ -692,7 +892,8 @@ impl Executor for MetaculusExecutor {
         ctx: &mut Context,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::metaculus::MetaculusPlatform::from(PlatformBuilder::default());
+        let platform =
+            api::metaculus::metaculus_api::MetaculusPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await.unwrap();
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("Trimmed News: {:?}", trimmed_news);
@@ -855,6 +1056,23 @@ impl Executor for MetaculusExecutor {
         let questions = ctx.questions;
         println!("Metaculus Executor executing");
     }
+    async fn fetch_result_by_id(
+        &self,
+        contract_id: &str,
+        ctx: Context,
+        tags: Option<Vec<String>>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+async fn parse_trade_prompt(best_trade: &str) -> f64 {
+    let trade_data = best_trade.split(",");
+    unimplemented!()
+}
+
+async fn best_trade(market: ManifoldMarket) -> String {
+    unimplemented!()
 }
 
 async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
@@ -899,8 +1117,52 @@ async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
     }
 }
 
+async fn send_automated_order_dryrun(
+    outcome: &str,
+    platform: ManifoldPlatform,
+    bet_params: BetParams,
+) {
+    // let bets_url = warp::path!("https://api.manifold.markets/v0/bets").and(warp::path::end()).and(warp::query::<BetParams>())
+    //     .map(move |bet_params: BetParams| {
+    //         let bet = platform.create_bet(bet_params);
+    //     });
+    let response = platform
+        .build_order(
+            &bet_params.contract_id.unwrap(),
+            bet_params.amount.unwrap(),
+            "1",
+            outcome,
+            bet_params.limit,
+        )
+        .await;
+
+    tracing::debug!("Response: {:?}", response);
+}
+
+async fn build_automated_order(
+    question: &str,
+    outcome: &str,
+    tags: Option<Vec<String>>,
+    ctx: &mut Context,
+    user_id: String,
+    amount: f64,
+) {
+    let platform = ManifoldPlatform::from(PlatformBuilder::default());
+
+    let executor =
+        ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
+    let mut context = Context::new();
+    let result = executor
+        .init(question, outcome, tags, &mut context)
+        .await
+        .unwrap();
+    tracing::debug!("Result: {:?}", result);
+    // let mut bet = BetParams{};
+    unimplemented!()
+}
+
 async fn info_per_trader() {
-    let platform = api::manifold::ManifoldPlatform::from(PlatformBuilder::default());
+    let platform = ManifoldPlatform::from(PlatformBuilder::default());
     let mut users = crate::model::manifold::get_all_users()
         //1000)
         .await
@@ -926,12 +1188,21 @@ fn parse_polymarket_event(event: PolymarketEvent) -> Result<serde_json::Value> {
     Ok(event_summarized)
 }
 
-fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
+fn parse_manifold_market(market: &ManifoldMarket) -> Result<serde_json::Value> {
     let probability: String = if let Some(probability) = market.probability {
-        probability.to_string()
+        (probability * 100.0).to_string()
     } else {
         "".to_string()
     };
+    // let outcomePrices = if let Some(pool) = &market.pool {
+    //     let mut outcomes = Vec::new();
+    //     for (key, value) in pool.iter() {
+    //         outcomes.push(format!("{}: {}", key, value.to_string()));
+    //     }
+    //     outcomes
+    //         } else {
+    //     vec!["0".to_string(), "0".to_string()]
+    // };
     // let pool: [String; 2] = if let Some(pool) = market.pool {
     //     [
     //         format!("Yes: {}", pool.YES.to_string()),
@@ -942,9 +1213,10 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
     // };
     let market_summarized = serde_json::json!({
         "question": market.question,
-        "probability": probability,
+        "probability_of_yes": probability,
         "bets": market.bets,
-        "pool": market.pool,
+        "number_of_shares": market.pool,
+        // "outcomes": market.outcomePrices
     //    "pool": pool,
     });
     Ok(market_summarized)
@@ -1143,6 +1415,33 @@ mod tests {
             .await
             .unwrap();
         tracing::debug!("Result: {:?}", result);
+    }
+    #[tokio::test]
+    async fn test_bet_dryrun() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        let bet_params = BetParams {
+            user_id: Some("v0KTj3BgbAMSp1XOpjcRYdliJbb2".to_string()),
+            amount: Some(100.),
+            contract_id: Some("6FQW9DSCHLCXAfpDHRZC".to_string()),
+            limit: Some(0.5),
+            contract_slug: None,
+            username: None,
+        };
+        let outcome = "YES".to_string();
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
+        let executor =
+            ManifoldExecutor::builder(1000, 1000, Promptor {}, ExecutorType::Manifold).build();
+        let mut context = Context::new();
+        let result = executor
+            .fetch_result_by_id("9Ccsjc0fmbIb9g50p7SB", context, None)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

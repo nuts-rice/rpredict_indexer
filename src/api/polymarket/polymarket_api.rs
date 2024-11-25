@@ -1,5 +1,5 @@
-use super::Result;
-use super::{Platform, PlatformBuilder};
+use crate::api::Result;
+use crate::api::{Platform, PlatformBuilder};
 use crate::polymarket::{PolymarketEvent, PolymarketMarket, PolymarketPosition};
 use crate::utils::auth;
 use async_trait::async_trait;
@@ -74,6 +74,10 @@ impl Platform for PolymarketPlatform {
         Ok(markets)
     }
 
+    async fn get_user_id(&self) -> Result<String> {
+        unimplemented!()
+    }
+
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {
         unimplemented!()
     }
@@ -97,6 +101,7 @@ impl Platform for PolymarketPlatform {
         amount: f64,
         nonce: &str,
         outcome: &str,
+        limit: Option<f64>,
     ) -> Result<()> {
         unimplemented!()
     }

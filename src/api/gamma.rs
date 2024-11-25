@@ -89,12 +89,17 @@ impl Platform for GammaPlatform {
         Ok(response)
     }
 
+    async fn get_user_id(&self) -> Result<String> {
+        unimplemented!()
+    }
+
     async fn build_order(
         &self,
         token: &str,
         amount: f64,
         nonce: &str,
         outcome: &str,
+        limit: Option<f64>,
     ) -> Result<()> {
         unimplemented!()
     }

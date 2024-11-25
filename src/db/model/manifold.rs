@@ -9,7 +9,7 @@ use serde_json::from_str;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-pub type BetPool = HashMap<String, f64>;
+pub type BetPool = HashMap<MarketOutcome, f64>;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum OutcomeType {
@@ -46,6 +46,11 @@ pub struct ManifoldMarket {
     pub isResolved: bool,
     pub mechanism: String,
     pub pool: Option<BetPool>,
+
+    // #[serde(deserialize_with = "deserialize_into_string_array")]
+    // pub pool: [String; 2],
+    // #[serde(default, deserialize_with = "deserialize_outcome_prices")]
+    // pub outcomePrices: Option<[f64; 2]>,
     pub marketTier: Option<String>,
     pub slug: String,
     pub outcomeType: String,
@@ -57,6 +62,80 @@ pub struct ManifoldMarket {
     pub bets: Option<Vec<Bet>>,
     pub lastBetTime: Option<f64>,
     // pub extraInfo: ExtraInfo,
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Hash, Eq, Serialize)]
+pub enum MarketOutcome {
+    #[serde(rename = "YES")]
+    Yes,
+    #[serde(rename = "NO")]
+    No,
+    #[serde(untagged)]
+    Other(String),
+}
+
+impl std::fmt::Display for MarketOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MarketOutcome::Yes => write!(f, "YES"),
+            MarketOutcome::No => write!(f, "NO"),
+            MarketOutcome::Other(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+fn deserialize_outcome_prices<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<[f64; 2]>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_s: Option<String> = Option::deserialize(deserializer)?;
+
+    match opt_s {
+        Some(s) => {
+            let vec_str: Vec<String> =
+                serde_json::from_str(&s).map_err(|err| de::Error::custom(err.to_string()))?;
+
+            if vec_str.len() != 2 {
+                return Err(de::Error::invalid_length(
+                    vec_str.len(),
+                    &"expected an array of length 2",
+                ));
+            }
+
+            let mut vec_f64 = [0.0; 2];
+            for (i, val_str) in vec_str.iter().enumerate() {
+                vec_f64[i] = val_str
+                    .parse::<f64>()
+                    .map_err(|e| de::Error::custom(e.to_string()))?;
+            }
+
+            Ok(Some(vec_f64))
+        }
+        None => Ok(None),
+    }
+}
+
+fn deserialize_into_string_array<'de, D>(
+    deserializer: D,
+) -> std::result::Result<[String; 2], D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+
+    let vec: Vec<String> =
+        serde_json::from_str(&s).map_err(|err| de::Error::custom(err.to_string()))?;
+
+    if vec.len() != 2 {
+        return Err(de::Error::invalid_length(
+            vec.len(),
+            &"expected an array of length 2",
+        ));
+    }
+
+    Ok([vec[0].clone(), vec[1].clone()])
 }
 
 impl ManifoldMarket {

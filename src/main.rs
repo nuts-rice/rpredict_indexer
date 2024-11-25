@@ -3,6 +3,8 @@ use crate::executor::executor::{
     Executor, ExecutorType, ManifoldExecutor, PolymarketExecutor, Promptor,
 };
 use crate::types::create_match;
+use api::manifold::manifold_api::ManifoldPlatform;
+use api::polymarket::{polymarket_api, utils};
 use api::Platform;
 use async_graphql::*;
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
@@ -12,6 +14,7 @@ use axum::{
     routing::get,
     Router,
 };
+
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     crossterm::{
@@ -42,7 +45,6 @@ pub mod server;
 pub mod strategies;
 pub mod types;
 pub mod ui;
-pub mod utils;
 pub use db::*;
 
 const MANIFOLD_ENDPOINT: &str = "https://api.manifold.markets/v0/markets";
@@ -71,7 +73,7 @@ async fn manifold_markets_index(pagiation: Option<Query<Pagiation>>) -> impl Int
     let pagiation = pagiation.unwrap_or_default();
     let offset = pagiation.offset.unwrap_or(0);
     let limit = pagiation.limit.unwrap_or(10);
-    let manifold = api::manifold::ManifoldPlatform::builder()
+    let manifold = ManifoldPlatform::builder()
         .build()
         .fetch_questions()
         .await
@@ -125,7 +127,7 @@ async fn render_markets(markets: Vec<ManifoldMarket>, offset: usize, limit: usiz
 
 async fn polymarket_markets_index(pagiation: Option<Query<Pagiation>>) -> impl IntoResponse {
     let pagiation = pagiation.unwrap_or_default();
-    let questions = api::polymarket::PolymarketPlatform::builder()
+    let questions = polymarket_api::PolymarketPlatform::builder()
         .build()
         .fetch_json()
         .await
@@ -157,7 +159,7 @@ async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl In
     let pagiation = pagiation.unwrap_or_default();
     let offset = pagiation.offset.unwrap_or(0);
     let limit = pagiation.limit.unwrap_or(10);
-    let metaculus_markets = api::metaculus::MetaculusPlatform::builder()
+    let metaculus_markets = api::metaculus::metaculus_api::MetaculusPlatform::builder()
         .build()
         .fetch_questions()
         .await
