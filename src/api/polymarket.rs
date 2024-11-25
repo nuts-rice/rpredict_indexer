@@ -74,6 +74,10 @@ impl Platform for PolymarketPlatform {
         Ok(markets)
     }
 
+    async fn get_user_id(&self) -> Result<String> {
+        unimplemented!()
+    }
+
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market> {
         unimplemented!()
     }

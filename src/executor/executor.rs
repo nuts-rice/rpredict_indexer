@@ -162,11 +162,16 @@ impl Promptor {
 
         Help users identify markets to trade based on their interests or queries.
         Provide specific information for markets including probabilities of outcomes.
-        Give your response in the following format:
-
-        I believe {} has a likelihood (float)% for outcome of {}.", market_data, event_data, market_question, outcome) + self.filter_markets().as_str() + self.filter_events().as_str();
+        Give your response in the following JSON format:
+        {{ 
+        Question: {} ,
+        Most_likely_outcome: {},
+        Probability_of_most_likely_outcome: 
+        }}", market_data, event_data, market_question, outcome); 
 
         prompt
+
+
     }
 
     pub fn prompts_manifold_filter_order(
@@ -184,9 +189,14 @@ impl Promptor {
 
         Help users identify a reasonable order to place based on the above.
         Provide specific information for the market including probabilities of outcomes.
-        Give your response in the following format:
+        Give your response in the following JSON format:                
+        {{ 
+        Question: {} ,
+        Possible_outcomes: {:?},
+        Most_likely_outcome: (outcomes),
+        Probability_of_most_likely_outcome: 
+        }}", market_data, event_data, market_question, outcomes); 
 
-        I believe out of all possible outcomes {:?} for the question {}, (outcome) is the most likely", market_data, event_data, outcomes, market_question) + self.filter_markets().as_str() + self.filter_events().as_str();
 
         prompt
     }
@@ -711,16 +721,118 @@ impl Executor for ManifoldExecutor {
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("News: {:?}", news);
         let market_summarized = parse_manifold_market(&market).unwrap();
+        let query = [("limit", "1")];
         tracing::debug!("Market: {:?}", market_summarized);
-        let client = anthropic_sdk::Client::new()
-            .model("claude-3-opus-20240229")
-            .messages(&json!([builder.promptor.prompts_manifold_filter_order(
-                market_summarized,
-                trimmed_news,
-                market.question.clone().as_str(),
-                market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>()
-            )]))
+        // let secret = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY must be set");
+        let client = async_openai::Client::new();
+        let prompt = builder.promptor.prompts_manifold_filter_order(
+            market_summarized,
+            trimmed_news,
+            market.question.clone().as_str(),
+            market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>()
+
+        );
+
+        let assistant_request = CreateAssistantRequestArgs::default()
+            .instructions(
+                prompt.clone()
+            )
+            .model("gpt-4o")
             .build()?;
+        let assistant = client.assistants().create(assistant_request).await?;
+        let assistant_id = assistant.id.clone();
+        let thread = client
+            .threads()
+            .create(CreateThreadRequest::default())
+            .await?;
+        let message = CreateMessageRequestArgs::default()
+            .role(MessageRole::User)
+            .content(prompt.clone())
+            .build()?;
+        let _message = client
+            .threads()
+            .messages(&thread.id)
+            .create(message)
+            .await?;
+        let run_request = CreateRunRequestArgs::default()
+            .assistant_id(assistant_id)
+            .build()?;
+        let mut run = client
+            .threads()
+            .runs(&thread.id)
+            .create(run_request)
+            .await?;
+        loop {
+            match run.status {
+                RunStatus::Completed => {
+                    let messages = client.threads().messages(&thread.id).list(&query).await?;
+                    for message_obj in messages.data {
+                        let message_contents = message_obj.content;
+                        for message_content in message_contents {
+                            match message_content {
+                                MessageContent::Text(text) => {
+                                    let text_data = text.text;
+                                    let annotations = text_data.annotations;
+                                    println!("{}", text_data.value);
+                                    println!("{annotations:?}");
+                                }
+                                MessageContent::ImageFile(_) | MessageContent::ImageUrl(_) => {
+                                    eprintln!("Images not supported on terminal");
+                                }
+                                MessageContent::Refusal(refusal) => {
+                                    println!("{refusal:?}");
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                RunStatus::Failed => {
+                    println!("> Run Failed: {:#?}", run);
+                    break;
+                }
+                RunStatus::Queued => {
+                    println!("> Run Queued");
+                }
+                RunStatus::Cancelling => {
+                    println!("> Run Cancelling");
+                }
+                RunStatus::Cancelled => {
+                    println!("> Run Cancelled");
+                    break;
+                }
+                RunStatus::Expired => {
+                    println!("> Run Expired");
+                    break;
+                }
+                RunStatus::RequiresAction => {
+                    println!("> Run Requires Action");
+                }
+                RunStatus::InProgress => {
+                    println!("> In Progress ...");
+                }
+                RunStatus::Incomplete => {
+                    println!("> Run Incomplete");
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            run = client.threads().runs(&thread.id).retrieve(&run.id).await?;
+        }
+        client.threads().delete(&thread.id).await?;
+        client.assistants().delete(&assistant.id).await?;
+        
+        // let request = anthropic_sdk::Client::new()
+        //     .auth(&secret)
+        //     .model("claude-3-opus-20240229")
+        //     .messages(&json!([builder.promptor.prompts_manifold_filter_order(
+        //         market_summarized,
+        //         trimmed_news,
+        //         market.question.clone().as_str(),
+        //         market.pool.unwrap().keys().collect::<Vec<&MarketOutcome>>()
+        //     )]))
+        //     .stream(true)
+        //     .build()?;
+        
 
         Ok(())
     }
@@ -760,7 +872,7 @@ impl Executor for MetaculusExecutor {
         ctx: &mut Context,
     ) -> Result<()> {
         let builder = &self.0;
-        let platform = api::metaculus::MetaculusPlatform::from(PlatformBuilder::default());
+        let platform = api::metaculus::metaculus_api::MetaculusPlatform::from(PlatformBuilder::default());
         let news = lookup_news(question, outcome).await.unwrap();
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("Trimmed News: {:?}", trimmed_news);
@@ -933,6 +1045,15 @@ impl Executor for MetaculusExecutor {
     }
 }
 
+async fn parse_trade_prompt(best_trade: &str) -> f64 {
+        let trade_data = best_trade.split(",");
+        unimplemented!()
+}
+
+async fn best_trade(market: ManifoldMarket) -> String {
+    unimplemented!()
+}
+
 async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
     let mut stdin = tokio::io::stdin();
     loop {
@@ -1071,9 +1192,9 @@ fn parse_manifold_market(market: &ManifoldMarket) -> Result<serde_json::Value> {
     // };
     let market_summarized = serde_json::json!({
         "question": market.question,
-        "probability": probability,
+        "probability_of_yes": probability,
         "bets": market.bets,
-        "pool": market.pool,
+        "number_of_shares": market.pool,
         // "outcomes": market.outcomePrices
     //    "pool": pool,
     });

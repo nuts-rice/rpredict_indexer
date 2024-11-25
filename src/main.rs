@@ -158,7 +158,7 @@ async fn metaculus_markets_index(pagiation: Option<Query<Pagiation>>) -> impl In
     let pagiation = pagiation.unwrap_or_default();
     let offset = pagiation.offset.unwrap_or(0);
     let limit = pagiation.limit.unwrap_or(10);
-    let metaculus_markets = api::metaculus::MetaculusPlatform::builder()
+    let metaculus_markets = api::metaculus::metaculus_api::MetaculusPlatform::builder()
         .build()
         .fetch_questions()
         .await

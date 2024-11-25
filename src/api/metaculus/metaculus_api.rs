@@ -1,5 +1,4 @@
-use super::Result;
-use super::{Platform, PlatformBuilder};
+use crate::api::{Platform, PlatformBuilder, Result};
 
 use crate::model::metaculus::{
     MetaculusEvent, MetaculusMarket, MetaculusPosition, MetaculusResponse,
@@ -108,6 +107,11 @@ impl Platform for MetaculusPlatform {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    async fn get_user_id(&self, ) -> Result<String> {
+        unimplemented!()
+    }
+
     async fn fetch_ratelimited(
         request_count: usize,
         interval_ms: Option<u64>,
@@ -144,6 +148,35 @@ impl Platform for MetaculusPlatform {
     }
 }
 
+
+async fn post_forecast(question_id: u32, probability_yes: f64, probability_yes_per_catagory: Option<Vec<f64>>) -> Result<()> {
+    let client = reqwest::Client::builder()
+        .build()?;
+    let url = format!("https://www.metaculus.com/api/questions/forecast");
+    let token: String = std::env::var("METACULUS_API_KEY").unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    let auth_header = format!("Token {}", token);
+    headers.insert("Authorization", auth_header.parse()?);
+    // headers.insert("Content-Type", "application/json".parse()?);
+
+    let mut prepped_body = serde_json::json!({
+        "question": question_id,               
+        "prediction": probability_yes
+    });
+    let body = prepped_body.as_object_mut().unwrap();
+    tracing::debug!("Prepped Order: {:?}", body.clone());
+    let request = client
+        .post(url)
+        .headers(headers)
+        .json(&body)
+        .send()
+        .await?
+        .error_for_status()?;
+    tracing::debug!("Response: {:?}", request);
+    Ok(())
+
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,4 +196,17 @@ mod tests {
 
         assert!(!questions.is_empty());
     }
+
+    #[tokio::test]
+    async fn test_metaculus_post_forecast() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        post_forecast(489, 0.6, None).await.unwrap();
+    }
+
 }

@@ -55,6 +55,8 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_json_by_description(&self, description: &str) -> Result<Vec<serde_json::Value>>;
     async fn fetch_question_by_id(&self, id: &str) -> Result<Self::Market>;
     async fn fetch_json(&self) -> Result<Vec<serde_json::Value>>;
+    async fn get_user_id(&self) -> Result<String>;
+
     async fn build_order(
         &self,
         contract_id: &str,

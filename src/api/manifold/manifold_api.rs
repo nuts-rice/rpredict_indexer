@@ -83,6 +83,11 @@ impl Platform for ManifoldPlatform {
             .expect("Failed to parse JSON response");
         Ok(response)
     }
+
+
+    async fn get_user_id(&self) -> Result<String> {
+        unimplemented!()
+    }
     async fn build_order(
         &self,
         contract_id: &str,
