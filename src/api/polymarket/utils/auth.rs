@@ -169,6 +169,7 @@ pub struct LayerTwoAuthHeader {
 #[cfg(test)]
 mod test {
     use super::*;
+    use alloy::signers::local::PrivateKeySigner;
     use tracing_subscriber::prelude::*;
     #[tokio::test]
     async fn test_sign_clob() {
@@ -179,5 +180,9 @@ mod test {
             )
             .with(tracing_subscriber::fmt::layer())
             .init();
+        let signer = PrivateKeySigner::random();
+        let clob_auth = LayerOneAuthHeader::new(signer.into()).await;
+        tracing::debug!("Signature produced by {}: {:?}", clob_auth.poly_address, clob_auth.poly_signature);
+            
     }
 }
