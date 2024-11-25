@@ -36,7 +36,7 @@ impl StrategyBuilder {
         let context = Context::new();
         Self { ctx: context }
     }
-    pub fn strat_config(mut self, config: StrategyConfig) -> Result<()> {
+    pub fn strat_config(self, config: StrategyConfig) -> Result<()> {
         let mut strat_config = self.ctx.strategy_config.write().unwrap();
         *strat_config = config;
         Ok(())

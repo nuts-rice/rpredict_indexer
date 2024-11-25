@@ -1,8 +1,6 @@
 use crate::context::Context;
-use crate::types::{MarketStandarized, Tick};
-use chrono::{DateTime, Utc};
+use crate::types::Tick;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 pub type MarketUpdateRecv = tokio::sync::mpsc::Receiver<MarketUpdateResult>;
 pub type MarketUpdateSend = tokio::sync::mpsc::Sender<MarketUpdateResult>;
 #[derive(Debug, Default)]

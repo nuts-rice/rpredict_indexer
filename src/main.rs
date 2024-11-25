@@ -1,30 +1,23 @@
 use crate::context::Context;
 use crate::executor::executor::{
-    Executor, ExecutorType, ManifoldExecutor, PolymarketExecutor, Promptor,
+    Executor, ExecutorType, ManifoldExecutor, Promptor,
 };
 use crate::types::create_match;
 use api::manifold::manifold_api::ManifoldPlatform;
 use api::polymarket::{polymarket_api, utils};
 use api::Platform;
 use async_graphql::*;
-use async_graphql_axum::{GraphQL, GraphQLSubscription};
 use axum::{
     extract::Query,
     response::{Html, IntoResponse},
-    routing::get,
-    Router,
 };
 
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    crossterm::{
-        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-        execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    },
+    backend::Backend,
+    crossterm::event::{self, KeyCode, KeyEventKind},
     style::Stylize,
     widgets::Paragraph,
-    DefaultTerminal, Terminal,
+    DefaultTerminal,
 };
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -270,7 +263,7 @@ async fn main() {
         .unwrap();
     tracing::debug!("result: {:#?}", result);
 
-    let mut dummy_questions = vec![
+    let dummy_questions = vec![
         "What is the probability of GPT-5 being availiable by 2025".to_string(),
         "What is the probability of Stalker 2 being released by 2025".to_string(),
         "Will the 10 Year Treasury Yield at closing on 12/31/2024 be 4% or higher?".to_string(),

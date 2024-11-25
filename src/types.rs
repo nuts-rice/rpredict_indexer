@@ -1,25 +1,17 @@
-use crate::{
-    api::{self, *},
-    manifold::{ManifoldMarket, ManifoldPosition},
-    StandardMarket,
-};
+use crate::manifold::ManifoldPosition;
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use clap::{Arg, Command};
-use diesel::upsert::excluded;
-use diesel::{pg::PgConnection, prelude::*, Connection, Insertable};
+use diesel::{prelude::*, Insertable};
 use qdrant_client::{config::QdrantConfig, Qdrant};
-use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     str::FromStr,
-    sync::{Arc, Mutex, RwLock},
+    sync::Arc,
 };
 use tokio_stream::Stream;
-use tokio_stream::StreamExt;
 
 pub type CollectorStream<'a, M> = Box<dyn Stream<Item = M> + Send + 'a>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]

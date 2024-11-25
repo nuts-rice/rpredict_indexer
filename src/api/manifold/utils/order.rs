@@ -1,5 +1,5 @@
 use crate::{
-    api::{manifold::manifold_api::ManifoldPlatform, PlatformBuilder},
+    api::manifold::manifold_api::ManifoldPlatform,
     manifold::ManifoldMarket,
     manifold::MarketOutcome,
 };

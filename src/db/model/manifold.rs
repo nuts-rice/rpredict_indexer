@@ -4,7 +4,6 @@ use super::*;
 use core::fmt;
 use serde::{de, Deserializer};
 use serde::{Deserialize, Serialize};
-use serde_json::from_str;
 
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -381,7 +380,7 @@ where
 
 pub async fn get_all_users(//limit: u32
 ) -> Result<Vec<User>> {
-    let url = format!("https://api.manifold.markets/v0/users");
+    let url = "https://api.manifold.markets/v0/users".to_string();
     //?limit={}", limit);
     let client = reqwest::Client::new();
     let res = client.get(&url).send().await.unwrap();

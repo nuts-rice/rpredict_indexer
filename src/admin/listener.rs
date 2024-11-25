@@ -1,10 +1,7 @@
 use crate::api::manifold::manifold_api::ManifoldPlatform;
-use crate::context::Context;
-use crate::types::StrategyConfig;
 use crate::types::Tick;
 use sled::Db;
 use std::sync::{Arc, RwLock};
-use tracing::info;
 pub type MarketRequestSnd = tokio::sync::mpsc::Sender<serde_json::Value>;
 pub type MarketRequestRcv = tokio::sync::mpsc::Receiver<serde_json::Value>;
 pub type MarketUpdateSnd = tokio::sync::mpsc::Sender<serde_json::Value>;

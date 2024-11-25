@@ -1,6 +1,6 @@
+use crate::utils::order::Side;
+use crate::utils::order::SignedOrder;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use crate::utils::orders::{SignedOrder, Side};
-
 #[derive(Deserialize, Debug)]
 pub struct GetTickSizeResponseBody {
     pub minimum_tick_size: f64,
@@ -128,4 +128,3 @@ pub enum OrderStatus {
     Delayed,
     Unmatched,
 }
-

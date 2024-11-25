@@ -1,4 +1,3 @@
-use reqwest::Client;
 use std::sync::Arc;
 pub struct NewsCollector<M> {
     provider: Arc<M>,

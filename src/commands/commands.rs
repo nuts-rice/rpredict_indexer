@@ -1,7 +1,7 @@
 use super::Result;
 use crate::Context;
 use clap::{Parser, Subcommand};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Rect},
@@ -9,8 +9,8 @@ use ratatui::{
     symbols::border,
     text::{Line, Text},
     widgets::{
-        block::{Position, Title},
-        Block, Paragraph, Widget, Wrap,
+        block::Title,
+        Block, Paragraph, Widget,
     },
     DefaultTerminal, Frame,
 };
@@ -41,7 +41,7 @@ pub async fn parse_markets(markets: Vec<serde_json::Value>) -> Result<Vec<String
         .iter()
         .map(|market| {
             let question = market["question"].as_str().unwrap();
-            format!("{}", question)
+            question.to_string()
         })
         .collect::<Vec<String>>();
     Ok(selectable_markets)

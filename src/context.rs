@@ -1,16 +1,9 @@
 use crate::{
-    api::{self, manifold::manifold_api::ManifoldPlatform, PlatformBuilder},
-    manifold::ManifoldMarket,
+    api::{manifold::manifold_api::ManifoldPlatform, PlatformBuilder},
     types::StrategyConfig,
 };
-use chrono::{DateTime, Utc};
-use qdrant_client::{config::QdrantConfig, Qdrant};
 use ratatui::widgets::ListState;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 pub struct StatefulList<T> {
     pub state: ListState,
@@ -66,6 +59,12 @@ pub struct Context
     //pub questions: Vec<MarketStandarized>,
     // pub selecteable_markets: StatefulList<&'a str>,
     pub exit: bool,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Context

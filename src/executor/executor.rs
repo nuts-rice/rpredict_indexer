@@ -1,20 +1,17 @@
 use crate::admin::listener::MarketUpdateRcv;
 use crate::api::manifold::manifold_api::ManifoldPlatform;
-use crate::api::manifold::utils::order::{prep_order, BetParams};
+use crate::api::manifold::utils::order::BetParams;
 use crate::api::{self, Platform, *};
 use crate::context::Context;
 use crate::manifold::{ManifoldMarket, MarketOutcome};
 use crate::model::manifold::User;
 use crate::polymarket::PolymarketEvent;
-use crate::{admin, types::*};
-use anthropic_sdk::*;
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
 use async_openai::types::{CreateMessageRequestArgs, CreateRunRequestArgs};
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        AssistantStreamEvent, AssistantTools, CreateAssistantRequestArgs, CreateMessageRequest,
-        CreateRunRequest, CreateThreadRequest, FunctionObject, MessageContent, MessageDeltaContent,
+        AssistantStreamEvent, CreateAssistantRequestArgs, CreateThreadRequest, MessageContent, MessageDeltaContent,
         MessageRole, RunObject, RunStatus, SubmitToolOutputsRunRequest, ToolsOutputs,
     },
     Client,
@@ -22,16 +19,15 @@ use async_openai::{
 use axum::async_trait;
 use futures_util::StreamExt;
 use qdrant_client::qdrant::{
-    CreateCollectionBuilder, Distance, PointStruct, SearchPointsBuilder, UpsertPointsBuilder,
+    CreateCollectionBuilder, Distance, PointStruct,
     VectorParamsBuilder,
 };
-use qdrant_client::{Payload, Qdrant};
-use serde_json::json;
+use qdrant_client::Qdrant;
 use std::any::Any;
 use std::sync::{Arc, RwLock};
 use tokio::io::AsyncReadExt;
 use tokio_tungstenite::tungstenite::protocol::Message;
-use warp::{http::StatusCode, Filter};
+// use warp::{http::StatusCode, Filter};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -292,7 +288,8 @@ Your answer will be used to use the tool so it must be very concise and make sur
     }
 
     async fn superforecaster(&self, question: &str, outcome: &str) -> String {
-        let prompt = format!(" You are a Superforecaster tasked with correctly predicting the likelihood of events.
+        
+        format!(" You are a Superforecaster tasked with correctly predicting the likelihood of events.
         Use the following systematic process to develop an accurate prediction for the following
         question={} and outcome={} combination. 
         
@@ -321,8 +318,7 @@ Your answer will be used to use the tool so it must be very concise and make sur
 
         Give your response in the following format:
 
-        The question {}; has a likelihood (float)% for outcome of (str).", question, outcome, outcome, question).to_string();
-        prompt
+        The question {}; has a likelihood (float)% for outcome of (str).", question, outcome, outcome, question).to_string()
     }
 }
 #[async_trait]
@@ -563,8 +559,8 @@ impl Executor for ManifoldExecutor {
         let trimmed_news = news.iter().take(5).collect::<Vec<&String>>();
         tracing::debug!("Trimmed News: {:?}", trimmed_news);
         // tracing::debug!("News: {:?}", news);
-        let mut point_id = 1;
-        let mut points: Vec<PointStruct> = Vec::new();
+        let point_id = 1;
+        let points: Vec<PointStruct> = Vec::new();
         let collection_name = "Manifold_collection";
         // let (tx, rx)  = tokio::sync::mpsc::channel(100);
         qdrant.read().unwrap().delete_collection(collection_name);
@@ -583,9 +579,9 @@ impl Executor for ManifoldExecutor {
                 let market_data = platform.fetch_markets_by_terms(&tag).await?;
                 let (markets_tx, markets_rx) = tokio::sync::mpsc::channel::<ManifoldMarket>(100);
                 market_data.iter().for_each(|m| {
-                    let market_summarized = parse_manifold_market(&m).unwrap();
+                    let market_summarized = parse_manifold_market(m).unwrap();
 
-                    markets.push(market_summarized.into());
+                    markets.push(market_summarized);
                 })
             }
         }
@@ -1052,7 +1048,7 @@ impl Executor for MetaculusExecutor {
 
     async fn execute(&self, ctx: Context, rx: MarketUpdateRcv) {
         let builder = &self.0;
-        let (platform) = ctx.manifold.read().unwrap();
+        let platform = ctx.manifold.read().unwrap();
         let questions = ctx.questions;
         println!("Metaculus Executor executing");
     }
@@ -1168,8 +1164,7 @@ async fn info_per_trader() {
         .await
         .unwrap();
     // let mut users: Vec<User> = crate::model::manifold::get_all_users(3000).await;
-    let top_users_by_profit =
-        users.sort_by(|a, b| b.cashBalance.partial_cmp(&a.cashBalance).unwrap());
+    users.sort_by(|a, b| b.cashBalance.partial_cmp(&a.cashBalance).unwrap());
     let top = users.iter().take(10).collect::<Vec<&User>>();
     tracing::debug!("Top 10 users by profit: {:?}", top);
 }
@@ -1313,7 +1308,7 @@ async fn lookup_news(question: &str, outcome: &str) -> Result<Vec<String>> {
         .results
         .iter()
         .map(|r| {
-            if (r.score.clone() > 0.5) {
+            if r.score > 0.5 {
                 r.content.clone()
             } else {
                 "".to_string()
@@ -1333,8 +1328,9 @@ fn filter_news() -> Result<Vec<serde_json::Value>> {
 }
 
 mod tests {
-    use super::*;
-    use tracing_subscriber::prelude::*;
+use super::*;    
+use tracing_subscriber::prelude::*;
+    
     #[tokio::test]
     async fn test_polymarket_executor() {
         let executor =

@@ -2,10 +2,9 @@ use crate::api::manifold::manifold_api::ManifoldPlatform;
 use crate::api::{Platform, PlatformBuilder};
 use crate::db::model::manifold::ManifoldMarket;
 use crate::manifold::ManifoldPosition;
-use crate::types::{Collector, CollectorStream, MarketStandarized, Tick};
+use crate::types::{Collector, MarketStandarized};
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio_stream::wrappers::BroadcastStream;
 
 enum ManifoldRequest {
     Market,
@@ -29,7 +28,7 @@ impl ManifoldCollector {
 #[async_trait]
 impl Collector<ManifoldMarket> for ManifoldCollector {
     async fn collect_all(&self) -> Result<Vec<MarketStandarized>> {
-        let mut platform = ManifoldPlatform::from(PlatformBuilder::default());
+        let platform = ManifoldPlatform::from(PlatformBuilder::default());
         let markets = platform.fetch_questions().await;
         // let stream = BroadcastStream::new(Box::new(markets));
         unimplemented!()

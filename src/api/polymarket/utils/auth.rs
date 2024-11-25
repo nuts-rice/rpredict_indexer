@@ -1,17 +1,16 @@
-use base64::{engine::general_purpose::URL_SAFE, prelude::BASE64_STANDARD, Engine};
-use chrono::Utc;
-use rand::{thread_rng, Rng};
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use crate::utils::orders;
 use alloy::{
-    primitives::{Address, U256},
+    primitives::U256,
     signers::Signer,
     sol,
     sol_types::eip712_domain,
 };
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use chrono::Utc;
+use rand::{thread_rng, Rng};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use serde::Serialize;
 use serde_json::Value;
+use std::sync::Arc;
 use uuid::Uuid;
 pub struct ApiCreds {
     pub api_key: String,
@@ -27,6 +26,12 @@ pub struct AmpCookie {
     opt_out: bool,
     last_event_time: i64,
     last_event_id: u32,
+}
+
+impl Default for AmpCookie {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AmpCookie {
@@ -79,7 +84,6 @@ sol! {
     }
 }
 
-
 pub struct ClobKeyResponse {}
 
 pub trait HeaderMapSerializeable {
@@ -114,9 +118,8 @@ pub struct LayerOneAuthHeader {
 
 impl HeaderMapSerializeable for LayerOneAuthHeader {}
 
-
 impl LayerOneAuthHeader {
-        pub async fn new<S: Signer + Send + Sync>(signer: Arc<S>) -> Self {
+    pub async fn new<S: Signer + Send + Sync>(signer: Arc<S>) -> Self {
         let timestamp = Utc::now().timestamp().to_string();
         let signature = Self::sign_clob_auth_message(signer.clone(), &timestamp).await;
 
@@ -164,4 +167,17 @@ pub struct LayerTwoAuthHeader {
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use super::*;
+    use tracing_subscriber::prelude::*;
+    #[tokio::test]
+    async fn test_sign_clob() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
+}

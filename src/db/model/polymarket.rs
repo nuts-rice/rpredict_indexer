@@ -1,5 +1,5 @@
 use super::*;
-use crate::utils::auth::{self, AmpCookie};
+use crate::utils::auth::{AmpCookie};
 //use alloy::sol_types::sol_data::String;
 use axum::Json;
 use core::fmt;

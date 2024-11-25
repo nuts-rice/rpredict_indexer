@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-alloy = { version = "0.6.4", features = ["full"] }
+alloy = { version = "0.6.4", features = ["eip712", "full"] }
 ansi_term = { version = "0.12.1", features = ["derive_serde_style", "serde"] }
 anthropic-sdk = "0.1.5"
 anyhow = "1.0.92"

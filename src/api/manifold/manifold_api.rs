@@ -1,7 +1,5 @@
-use crate::api::base_request;
 use crate::api::{Platform, PlatformBuilder, Result};
-use crate::db;
-use crate::manifold::{ExtraInfo, ManifoldEvent};
+use crate::manifold::ManifoldEvent;
 use crate::model::manifold::ManifoldPosition;
 use crate::model::manifold::{Bet, ManifoldMarket};
 use crate::types::Tick;
@@ -11,7 +9,7 @@ use reqwest_middleware::ClientWithMiddleware;
 pub struct ManifoldPlatform(PlatformBuilder<Self>);
 
 //TODO: use this to grab tags
-const GROUP_URL: &'static str = "https://api.manifold.markets/v0/groups";
+const GROUP_URL: &str = "https://api.manifold.markets/v0/groups";
 impl From<PlatformBuilder<Self>> for ManifoldPlatform {
     fn from(value: PlatformBuilder<Self>) -> Self {
         Self(value)
@@ -179,14 +177,14 @@ impl Platform for ManifoldPlatform {
 }
 
 async fn probability_series(id: &str) -> Vec<(u64, f64)> {
-    use crate::api::manifold;
+    
     let times: Vec<u64> = vec![];
     let probabilities: Vec<f64> = vec![];
     let platform = ManifoldPlatform::from(PlatformBuilder::default());
-    let mut trimmed_markets: Vec<serde_json::Value> = Vec::new();
+    let trimmed_markets: Vec<serde_json::Value> = Vec::new();
     let bets = platform.fetch_orderbook(id).await.unwrap();
 
-    if bets.len() == 0 {
+    if bets.is_empty() {
         return vec![];
     }
     let market = platform.fetch_question_by_id(id).await.unwrap();
@@ -239,7 +237,7 @@ fn is_valid(market: ManifoldMarket) -> bool {
         && market.resolution != Some("CANCEL".to_string())
 }
 
-fn get_ticks(mut bets: Vec<Bet>) -> Result<Vec<Tick>> {
+fn get_ticks(bets: Vec<Bet>) -> Result<Vec<Tick>> {
     unimplemented!()
 }
 
@@ -266,8 +264,10 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
 }
 
 mod tests {
-    use super::*;
-    use tracing_subscriber::prelude::*;
+use super::*;    
+use tracing_subscriber::prelude::*;
+    
+    
     #[tokio::test]
     async fn test_manifold_markets() {
         // tracing_subscriber::registry()

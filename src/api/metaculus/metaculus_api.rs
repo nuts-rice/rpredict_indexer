@@ -3,7 +3,6 @@ use crate::api::{Platform, PlatformBuilder, Result};
 use crate::model::metaculus::{
     MetaculusEvent, MetaculusMarket, MetaculusPosition, MetaculusResponse,
 };
-use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
 pub struct MetaculusPlatform(PlatformBuilder<Self>);
@@ -154,7 +153,7 @@ async fn post_forecast(
     probability_yes_per_catagory: Option<Vec<f64>>,
 ) -> Result<()> {
     let client = reqwest::Client::builder().build()?;
-    let url = format!("https://www.metaculus.com/api/questions/forecast");
+    let url = "https://www.metaculus.com/api/questions/forecast".to_string();
     let token: String = std::env::var("METACULUS_API_KEY").unwrap();
     let mut headers = reqwest::header::HeaderMap::new();
     let auth_header = format!("Token {}", token);
