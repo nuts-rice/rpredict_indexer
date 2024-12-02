@@ -5,23 +5,21 @@ use crate::api::{self, Platform, *};
 use crate::context::Context;
 use crate::manifold::{ManifoldMarket, MarketOutcome};
 use crate::model::manifold::User;
-use crate::polymarket::PolymarketEvent;
+use crate::polymarket::polymarket_market::PolymarketEvent;
 use async_openai::types::realtime::{ConversationItemCreateEvent, Item, ResponseCreateEvent};
 use async_openai::types::{CreateMessageRequestArgs, CreateRunRequestArgs};
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        AssistantStreamEvent, CreateAssistantRequestArgs, CreateThreadRequest, MessageContent, MessageDeltaContent,
-        MessageRole, RunObject, RunStatus, SubmitToolOutputsRunRequest, ToolsOutputs,
+        AssistantStreamEvent, CreateAssistantRequestArgs, CreateThreadRequest, MessageContent,
+        MessageDeltaContent, MessageRole, RunObject, RunStatus, SubmitToolOutputsRunRequest,
+        ToolsOutputs,
     },
     Client,
 };
 use axum::async_trait;
 use futures_util::StreamExt;
-use qdrant_client::qdrant::{
-    CreateCollectionBuilder, Distance, PointStruct,
-    VectorParamsBuilder,
-};
+use qdrant_client::qdrant::{CreateCollectionBuilder, Distance, PointStruct, VectorParamsBuilder};
 use qdrant_client::Qdrant;
 use std::any::Any;
 use std::sync::{Arc, RwLock};
@@ -288,7 +286,6 @@ Your answer will be used to use the tool so it must be very concise and make sur
     }
 
     async fn superforecaster(&self, question: &str, outcome: &str) -> String {
-        
         format!(" You are a Superforecaster tasked with correctly predicting the likelihood of events.
         Use the following systematic process to develop an accurate prediction for the following
         question={} and outcome={} combination. 
@@ -1328,9 +1325,9 @@ fn filter_news() -> Result<Vec<serde_json::Value>> {
 }
 
 mod tests {
-use super::*;    
-use tracing_subscriber::prelude::*;
-    
+    use super::*;
+    use tracing_subscriber::prelude::*;
+
     #[tokio::test]
     async fn test_polymarket_executor() {
         let executor =

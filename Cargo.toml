@@ -24,6 +24,7 @@ diesel = { version = "2.2.4", features = ["chrono", "postgres", "serde_json"] }
 eyre = "0.6.12"
 futures-channel = "0.3.30"
 futures-util = "0.3.30"
+hmac = "0.12.1"
 http-body-util = "0.1.2"
 hyper = { version = "1.4.1", features = ["full"] }
 hyper-util = { version = "0.1.8", features = ["full"] }
@@ -40,6 +41,7 @@ reqwest-retry = "0.6.1"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 serde_repr = "0.1.19"
+sha2 = "0.10.8"
 slab = { version = "0.4.9", features = ["serde"] }
 sled = "0.34.7"
 sqlx = "0.8.2"

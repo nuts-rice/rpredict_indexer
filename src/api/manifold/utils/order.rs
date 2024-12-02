@@ -1,6 +1,5 @@
 use crate::{
-    api::manifold::manifold_api::ManifoldPlatform,
-    manifold::ManifoldMarket,
+    api::manifold::manifold_api::ManifoldPlatform, manifold::ManifoldMarket,
     manifold::MarketOutcome,
 };
 use serde::{Deserialize, Serialize};

@@ -8,10 +8,7 @@ use ratatui::{
     style::Stylize,
     symbols::border,
     text::{Line, Text},
-    widgets::{
-        block::Title,
-        Block, Paragraph, Widget,
-    },
+    widgets::{block::Title, Block, Paragraph, Widget},
     DefaultTerminal, Frame,
 };
 #[derive(Parser)]

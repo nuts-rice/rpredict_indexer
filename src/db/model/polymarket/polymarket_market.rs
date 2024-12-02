@@ -1,5 +1,5 @@
 use super::*;
-use crate::utils::auth::{AmpCookie};
+use crate::utils::auth::AmpCookie;
 //use alloy::sol_types::sol_data::String;
 use axum::Json;
 use core::fmt;
@@ -184,7 +184,7 @@ where
 }
 
 impl PolymarketTrade {
-    pub fn get_trade(&self, id: &str) -> Result<PolymarketTrade> {
+    pub fn get_trade(&self, id: &str) -> eyre::Result<PolymarketTrade> {
         let url = format!("{}/{}", CLOB_TRADES_URL, id);
         unimplemented!()
     }
@@ -230,11 +230,11 @@ pub async fn get_user(
     polymarket_nonce: &str,
     polymarket_session: &str,
     proxy: Option<&Proxy>,
-) -> Result<PolymarketUser> {
+) -> eyre::Result<PolymarketUser> {
     unimplemented!()
 }
 
-pub async fn get_all_users(limit: u32) -> Result<Vec<PolymarketUser>> {
+pub async fn get_all_users(limit: u32) -> eyre::Result<Vec<PolymarketUser>> {
     unimplemented!()
 }
 

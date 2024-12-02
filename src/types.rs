@@ -7,10 +7,7 @@ use clap::{Arg, Command};
 use diesel::{prelude::*, Insertable};
 use qdrant_client::{config::QdrantConfig, Qdrant};
 use serde::{Deserialize, Serialize};
-use std::{
-    str::FromStr,
-    sync::Arc,
-};
+use std::{str::FromStr, sync::Arc};
 use tokio_stream::Stream;
 
 pub type CollectorStream<'a, M> = Box<dyn Stream<Item = M> + Send + 'a>;

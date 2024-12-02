@@ -786,10 +786,14 @@ impl UserMarketOrder {
     }
 }
 
+pub async fn place_order() {
+    unimplemented!()
+}
+
 #[cfg(test)]
 mod test {
-use super::*;    
-use tracing_subscriber::prelude::*;
+    use super::*;
+    use tracing_subscriber::prelude::*;
 
     #[tokio::test]
     pub async fn test_build_polymarket_order() {

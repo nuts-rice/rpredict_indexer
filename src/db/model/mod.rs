@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use self::metaculus::MetaculusMarket;
-use self::polymarket::PolymarketMarket;
+use self::polymarket::polymarket_market::PolymarketMarket;
 use self::question::DBQuestion;
 use self::question::QuestionStorage;
 pub mod augur;

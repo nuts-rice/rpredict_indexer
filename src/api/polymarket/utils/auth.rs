@@ -1,21 +1,35 @@
 use alloy::{
-    primitives::U256,
+    primitives::{Address, U256},
     signers::Signer,
     sol,
     sol_types::eip712_domain,
 };
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{engine::general_purpose::URL_SAFE, prelude::BASE64_STANDARD, Engine};
 use chrono::Utc;
+use hmac::{Hmac, Mac};
 use rand::{thread_rng, Rng};
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::{
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Proxy,
+};
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
+use sha2::Sha256;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 pub struct ApiCreds {
     pub api_key: String,
     pub api_passphrase: String,
     pub api_secret: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ClobApiKey {
+    pub key: String,
+    pub secret: String,
+    pub passphrase: String,
 }
 
 #[derive(Serialize)]
@@ -154,16 +168,88 @@ impl LayerOneAuthHeader {
 
         const_hex::encode_prefixed(signed_message.as_bytes())
     }
+
+    pub async fn derive_api_key<S>(
+        signer: Arc<S>,
+        proxy: Option<&Proxy>,
+    ) -> anyhow::Result<ClobApiKey>
+    where
+        S: Signer + Send + Sync,
+    {
+        let header = LayerOneAuthHeader::new(signer.clone()).await.to_headermap();
+        let mut args = HashMap::new();
+        args.insert("geo_block_token", "");
+        let client = reqwest::Client::builder()
+            .proxy(proxy.unwrap().clone())
+            .build()?;
+        let request = client
+            .request(
+                reqwest::Method::GET,
+                "https://clob.polymarket.com/auth/derive-api-key",
+            )
+            .query(&args)
+            .headers(header);
+        let response = request.send().await?;
+        let response = response.error_for_status()?.json::<ClobApiKey>().await?;
+        Ok(response)
+    }
 }
 
 #[derive(Serialize, Debug)]
 pub struct LayerTwoAuthHeader {
     poly_address: String,
-    poly_nonce: String,
     poly_signature: String,
     poly_timestamp: String,
     poly_api_key: String,
     poly_passphrase: String,
+}
+
+impl HeaderMapSerializeable for LayerTwoAuthHeader {}
+
+impl LayerTwoAuthHeader {
+    pub fn new(
+        address: &str,
+        creds: ApiCreds,
+        method: &str,
+        path: &str,
+        body: Option<&str>,
+        timestamp: Option<String>,
+    ) -> Self {
+        let timestamp = timestamp.unwrap_or_else(|| Utc::now().timestamp().to_string());
+        let signature = Self::build_signature(&timestamp, &creds.api_secret, method, path, body);
+        Self {
+            poly_address: address.to_string(),
+            poly_signature: signature,
+            poly_timestamp: timestamp,
+            poly_api_key: creds.api_key,
+            poly_passphrase: creds.api_passphrase,
+        }
+    }
+    pub fn build_signature(
+        timestamp: &str,
+        secret: &str,
+        method: &str,
+        path: &str,
+        body: Option<&str>,
+    ) -> String {
+        let mut message = format!("{}{}{}", timestamp, method, path);
+        if let Some(body) = body {
+            message = format!("{}{}", message, body);
+        }
+        let bs64_secret = URL_SAFE.decode(secret).unwrap();
+
+        let mut mac = Hmac::<Sha256>::new_from_slice(&bs64_secret).unwrap();
+        mac.update(message.as_bytes());
+
+        let result = mac.finalize();
+        let hmac_bytes = result.into_bytes();
+
+        URL_SAFE.encode(hmac_bytes)
+    }
+}
+
+pub fn get_proxy_wallet_address<S>(signer: Arc<S>) -> Address {
+    unimplemented!()
 }
 
 #[cfg(test)]
@@ -182,7 +268,23 @@ mod test {
             .init();
         let signer = PrivateKeySigner::random();
         let clob_auth = LayerOneAuthHeader::new(signer.into()).await;
-        tracing::debug!("Signature produced by {}: {:?}", clob_auth.poly_address, clob_auth.poly_signature);
-            
+        tracing::debug!(
+            "Signature produced by {}: {:?}",
+            clob_auth.poly_address,
+            clob_auth.poly_signature
+        );
+    }
+
+    async fn test_derive_key() {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        let signer = PrivateKeySigner::random();
+        // let account =
+        unimplemented!()
     }
 }

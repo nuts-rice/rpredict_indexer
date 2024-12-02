@@ -177,7 +177,6 @@ impl Platform for ManifoldPlatform {
 }
 
 async fn probability_series(id: &str) -> Vec<(u64, f64)> {
-    
     let times: Vec<u64> = vec![];
     let probabilities: Vec<f64> = vec![];
     let platform = ManifoldPlatform::from(PlatformBuilder::default());
@@ -264,10 +263,9 @@ fn parse_manifold_market(market: ManifoldMarket) -> Result<serde_json::Value> {
 }
 
 mod tests {
-use super::*;    
-use tracing_subscriber::prelude::*;
-    
-    
+    use super::*;
+    use tracing_subscriber::prelude::*;
+
     #[tokio::test]
     async fn test_manifold_markets() {
         // tracing_subscriber::registry()

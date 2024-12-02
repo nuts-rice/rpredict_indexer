@@ -1,7 +1,5 @@
 use crate::context::Context;
-use crate::executor::executor::{
-    Executor, ExecutorType, ManifoldExecutor, Promptor,
-};
+use crate::executor::executor::{Executor, ExecutorType, ManifoldExecutor, Promptor};
 use crate::types::create_match;
 use api::manifold::manifold_api::ManifoldPlatform;
 use api::polymarket::{polymarket_api, utils};
@@ -23,7 +21,11 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-use db::{manifold::ManifoldMarket, metaculus::MetaculusMarket, polymarket::PolymarketResult};
+use db::{
+    manifold::ManifoldMarket, metaculus::MetaculusMarket,
+    polymarket::polymarket_market::PolymarketResult,
+};
+
 use serde::Deserialize;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod admin;

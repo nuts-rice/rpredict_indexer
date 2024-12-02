@@ -1,6 +1,6 @@
 use crate::api::Result;
 use crate::api::{Platform, PlatformBuilder};
-use crate::polymarket::{PolymarketEvent, PolymarketMarket, PolymarketPosition};
+use crate::polymarket::polymarket_market::{PolymarketEvent, PolymarketMarket, PolymarketPosition};
 use async_trait::async_trait;
 use serde_json::json;
 //https://github.com/Polymarket/py-clob-client
@@ -211,10 +211,9 @@ pub async fn fetch_events_by_tag(tag: &str) -> Result<Vec<PolymarketEvent>> {
 }
 
 mod tests {
-use super::*;    
-use tracing_subscriber::prelude::*;
-    
-    
+    use super::*;
+    use tracing_subscriber::prelude::*;
+
     #[tokio::test]
     async fn test_polymarket_markets() {
         let platform = PolymarketPlatform::from(PlatformBuilder::default());
