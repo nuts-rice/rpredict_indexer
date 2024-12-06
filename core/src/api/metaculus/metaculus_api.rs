@@ -21,6 +21,14 @@ impl Platform for MetaculusPlatform {
     type Market = MetaculusMarket;
     type Event = MetaculusEvent;
     type Position = MetaculusPosition;
+    async fn init_api_keys(&self) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn init_approvals(&self) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let token: String = std::env::var("METACULUS_TOKEN").expect("METACULUS_TOKEN not set");
         let web_token = format!("Token {}", token);

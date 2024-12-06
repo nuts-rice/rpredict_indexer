@@ -74,6 +74,9 @@ pub trait Platform: From<PlatformBuilder<Self>> + Any {
     async fn fetch_orderbook(&self, id: &str) -> Result<Vec<Self::Position>>;
     async fn fetch_markets_by_terms(&self, terms: &str) -> Result<Vec<Self::Market>>;
     async fn subscribe_to(&self) -> Result<()>;
+
+    async fn init_api_keys(&self) -> Result<()>;
+    async fn init_approvals(&self) -> Result<()>;
     type Market;
     type Event;
     type Position;

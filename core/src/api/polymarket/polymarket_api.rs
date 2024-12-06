@@ -30,6 +30,14 @@ impl Platform for PolymarketPlatform {
     type Market = PolymarketMarket;
     type Event = PolymarketEvent;
     type Position = PolymarketPosition;
+    async fn init_api_keys(&self) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn init_approvals(&self) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str().to_owned() + "/markets";
@@ -152,6 +160,7 @@ impl Platform for PolymarketPlatform {
             description,
         );
         let response = builder
+
             .client
             .get(url)
             // .query(&args)
@@ -209,6 +218,12 @@ pub async fn fetch_events_by_tag(tag: &str) -> Result<Vec<PolymarketEvent>> {
         .await?;
     Ok(response)
 }
+
+pub async fn build_local_rag(local_db_dir: &str) -> Result<()> {
+    // let platform = PolymarketPlatform::from(PlatformBuilder::default());
+    unimplemented!()
+}
+
 
 mod tests {
     use super::*;

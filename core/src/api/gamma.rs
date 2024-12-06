@@ -31,6 +31,14 @@ impl Platform for GammaPlatform {
     type Market = GammaMarket;
     type Event = crate::db::gamma::GammaEvent;
     type Position = GammaPosition;
+    async fn init_api_keys(&self) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn init_approvals(&self) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.to_owned() + "/markets";

@@ -2,4 +2,4 @@
 .local-history
 Cargo.lock
 .env
-]
+scripts/target

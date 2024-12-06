@@ -23,6 +23,14 @@ impl Platform for ManifoldPlatform {
     type Market = ManifoldMarket;
     type Event = ManifoldEvent;
     type Position = ManifoldPosition;
+    async fn init_api_keys(&self) -> Result<()> {
+        unimplemented!()
+    }
+
+    async fn init_approvals(&self) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn fetch_questions(&self) -> Result<Vec<Self::Market>> {
         let builder = &self.0;
         let url = builder.endpoint.as_str();
