@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 clap = {version = "^4", features = ["derive"]}
-rpredict_indexer = { path = "../" }
+rpredict = { path = "../core" }
 tokio = "1.42.0"

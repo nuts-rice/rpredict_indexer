@@ -27,6 +27,7 @@ pub async fn handle_ask_llm(user_input: &str) -> Result<()> {
 }
 
 pub async fn handle_ask_polymarket_llm(user_input: &str) -> Result<()> {
+    // let executor = crate::
     unimplemented!()
 }
 
