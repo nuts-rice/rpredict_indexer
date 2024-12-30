@@ -1,9 +1,10 @@
 use crate::{
-    api::{manifold::manifold_api::ManifoldPlatform, PlatformBuilder},
+    api::{manifold::manifold_api::ManifoldPlatform, PlatformBuilder, Platform},
     types::StrategyConfig,
 };
 use ratatui::widgets::ListState;
-use std::sync::{Arc, RwLock};
+use sled::Db;
+use std::{str::FromStr, sync::{Arc, RwLock}};
 
 pub struct StatefulList<T> {
     pub state: ListState,
@@ -52,18 +53,50 @@ pub struct Context
 {
     pub id: String,
     pub strategy_config: Arc<RwLock<StrategyConfig>>,
-    pub manifold: Arc<RwLock<ManifoldPlatform>>,
+    // pub manifold: Arc<RwLock<ManifoldPlatform>>,
+    // pub market_platform: Arc<RwLock<Platform>>, 
     //pub questions: //Arc<RwLock<Vec<serde_json::Value>>>,
-    pub questions: Vec<serde_json::Value>,
+    pub questions_db: Arc<RwLock<Db>>,
+    pub selected_market: Option<SelectedMarket>,
     //TODO: cross platforms
     //pub questions: Vec<MarketStandarized>,
     // pub selecteable_markets: StatefulList<&'a str>,
     pub exit: bool,
 }
 
+enum SelectedMarket {
+    MANIFOLD,
+    METACULUS,
+    POLYMARKET,
+    AUGUR,
+}
+
+impl FromStr for SelectedMarket {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MANIFOLD" => Ok(Self::MANIFOLD),
+            "METACULUS" => Ok(Self::METACULUS),
+            "POLYMARKET" => Ok(Self::POLYMARKET),
+            "AUGUR" => Ok(Self::AUGUR),
+            _ => Err(()),
+        }
+    }
+}
+
+
+
 impl Default for Context {
     fn default() -> Self {
-        Self::new()
+        let strategy_config = StrategyConfig::default();
+        Self {
+            // manifold: Arc::new(RwLock::new(manifold)),
+            selected_market: None,
+            id: "default".to_string(),
+            strategy_config: Arc::new(RwLock::new(strategy_config)),
+            questions_db: Arc::new(RwLock::new(sled::open("questions_db").unwrap()), 
+            exit: false,
+        }
     }
 }
 
@@ -73,14 +106,18 @@ impl Context
     pub fn new() -> Self {
         let manifold = ManifoldPlatform::from(PlatformBuilder::default());
         let strategy_config = StrategyConfig::default();
-        let selecteable_markets =
-            StatefulList::with_items(vec!["Market 1", "Market 2", "Market 3"]);
         Self {
             manifold: Arc::new(RwLock::new(manifold)),
+            selected_market: None,
             id: "default".to_string(),
             strategy_config: Arc::new(RwLock::new(strategy_config)),
             questions: vec![],
             exit: false,
         }
     }
+
+    pub fn set_selected_market(&mut self, selected_market: &str) {
+        self.selected_market = SelectedMarket::from_str(selected_market).unwrap();
+    }
+
 }

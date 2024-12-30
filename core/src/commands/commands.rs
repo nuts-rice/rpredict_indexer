@@ -30,6 +30,28 @@ pub enum Commands {
         #[clap(short, long)]
         outcome: Option<String>,
     },
+    #[clap(about = "Query local market database")]
+    QueryLocalDB {
+        #[clap(short, long)]
+        local_db_dir: Option<String>,
+        #[clap(shor, long)]
+        query: Option<String>
+    },
+    #[clap(about = "Ask a LLM for specific market")]
+    AskMarketLLM {
+        question_title: Option<String>,
+        selected_market: Option<String>,
+    },
+    #[clap(about = "Get all markets")]
+    GetAllMarkets {
+        #[clap(short, long)]
+        selected_market: Option<String>,
+        #[clap(short, long)]
+        limit: Option<u32>,
+        #[clap(short, long)]
+        sort_by: Option<String>,
+    }
+
 }
 
 //TODO: Standarized market
@@ -63,9 +85,51 @@ pub fn handle_events(ctx: Context) -> std::io::Result<()> {
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
             handle_key_event(ctx, key_event);
         }
+
         _ => {}
     };
     Ok(())
+}
+
+pub fn handle_cli(ctx: Context) -> Result<()> {
+    let cli = Cli::parse();
+    match cli {
+        Commands::AskSuperforecaster {
+            question_title,
+            description,
+            outcome,
+        } => {
+            let question = question_title.unwrap();
+            let outcome = outcome.unwrap();
+            ask_superforecaster(question.as_str(), outcome.as_str()).await?;
+            Ok(())
+        }
+        Commands::QueryLocalDB { local_db_dir, query } => {
+            let query = query.unwrap();
+            let db_dir = local_db_dir.unwrap();
+            query_local_market_db(query.as_str(), db_dir.as_str()).await?;
+            Ok(())
+        }
+        Commands::AskMarketLLM {
+            question_title,
+            selected_market,
+        } => {
+            let question = question_title.unwrap();
+            let selected_market = selected_market.unwrap();
+            ask_market_llm(question.as_str(), selected_market.as_str()).await?;
+            Ok(())
+        }
+        Commands::GetAllMarkets {
+            selected_market,
+            limit,
+            sort_by,
+        } => {
+            let limit = limit.unwrap();
+            let sort_by = sort_by.unwrap();
+            get_all_markets(limit, sort_by.as_str()).await?;
+            Ok(())
+        }
+    }
 }
 
 pub fn handle_key_event(ctx: Context, key_event: KeyEvent) {}
@@ -88,6 +152,18 @@ pub fn draw(ctx: Context, frame: &mut Frame) {
 // }
 
 pub async fn get_all_markets(limit: u32, sort_by: &str) -> Result<()> {
+    unimplemented!()
+}
+
+pub async fn query_local_market_db(query: &str, db_dir: &str) -> Result<()> {
+    unimplemented!()
+}
+
+pub async fn ask_superforecaster(question: &str, outcome: &str) -> Result<()> {
+    unimplemented!()
+}
+
+pub async fn ask_market_llm(question: &str, selected_market: &str) -> Result<()> {
     unimplemented!()
 }
 
